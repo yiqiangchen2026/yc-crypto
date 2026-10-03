@@ -106,5 +106,23 @@
     "url": "https://www.binance.com/en/support/announcement/detail/4a08577b7adc43a69b0728ace18e72bb",
     "source": "https://www.binance.com/en/support/announcement/detail/4a08577b7adc43a69b0728ace18e72bb",
     "verified": "2026-10-03"
+  },
+  {
+    "id": "pancake-apm",
+    "title": "apM Fashion 交易活动",
+    "platform": "PancakeSwap",
+    "chain": "BNB Chain",
+    "kind": "达标抽奖",
+    "start": "2026-09-25T06:00:00Z",
+    "end": "2026-10-09T06:00:00Z",
+    "reward": "10,416,666 APM",
+    "assets": "APM 交易对；合约 0x72a22faa6a522c81a8f5d508381e18af3da0921e",
+    "rules": "累计交易量达到 $500 / $2,000 / $5,000 / $10,000 对应抽奖档位；不是按交易量排序。每个钱包最多获得一份奖励。",
+    "entry": "仅 PancakeSwap 官方 Swap 页面（Web / Mobile，含 Infinity、V2、V3）交易计入；外部聚合器成交不计入。",
+    "lp": "观察 APM 的实际成交池及流动性类型。达标后用户可能停止交易，对持续成交的激励弱于交易量排名赛；池地址、费率与路由待核实。",
+    "note": "奖池以 APM 数量计价。官方页面列出四档，但后文仍写“三档”，高档回落抽奖规则存在表述不一致，需以官方澄清为准。",
+    "url": "https://blog.pancakeswap.finance/articles/apm-fashion-trading-competition",
+    "source": "https://blog.pancakeswap.finance/articles/apm-fashion-trading-competition",
+    "verified": "2026-10-03"
   }
 ]

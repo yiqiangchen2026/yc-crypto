@@ -52,7 +52,7 @@ for event in calendar:
     seen.add(event['id'])
     assert event['start'].endswith('Z') and event['end'].endswith('Z'), 'Use UTC dates'
     assert datetime.fromisoformat(event['start']) < datetime.fromisoformat(event['end']), 'Invalid competition period'
-    assert event['kind'] in ('交易量赛', '盈利赛'), 'Unknown scoring method'
+    assert event['kind'] in ('交易量赛', '盈利赛', '达标抽奖'), 'Unknown scoring method'
     for key in ('url', 'source'):
         assert urlsplit(event[key]).scheme == 'https' and urlsplit(event[key]).netloc, 'Invalid source URL'
 print(f'Checked {len(calendar)} calendar periods: required fields, UTC dates and sources passed.')
