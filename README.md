@@ -26,6 +26,8 @@ npm run check
 - `site/index.html`：首页
 - `site/projects/`：项目库
 - `site/projects/okx-rwa/`：OKX RWA 策略与技巧
+- `site/competitions/`：交易赛日历（日程 / 月历、筛选、时区切换）
+- `site/competitions/data.json`：官方来源、UTC 赛程及 LP 观察说明
 - `site/arsenal/`：武器库
 - `site/arsenal/okx-lp-range/`：OKX LP 区间快捷设置图文教程
 - `site/assets/`：教程配图
@@ -61,3 +63,7 @@ npm run deploy
 项目文章保留原帖来源和整理日期。修改教程时核对工具当前源码、版本和实际界面；不要将历史活动参数描述为当前官方规则。
 
 本项目保留原有页面设计与 URL。公开发布内容包含 YC 提供的教程截图；仓库不包含部署凭据或本机授权文件。
+
+## 交易赛日历维护
+
+在 `site/competitions/data.json` 中追加赛程。开始 / 结束时间使用含 Z 的 UTC ISO 时间；多轮比赛分别建赛程，共用官方来源，不重复宣传总奖池。核实日期填写实际复核日期，未确认的链、合约和池子明确标注待核实。页面默认北京时间，可切换日本时间或 UTC，交易期结束自动归档；官方规则变化仍需人工复核。禁用 JavaScript 时的官方链接在日历 HTML 的 noscript 中同步维护。

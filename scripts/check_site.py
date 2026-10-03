@@ -39,3 +39,20 @@ for path, page in pages.items():
 if errors:
     raise SystemExit('\n'.join(errors))
 print(f'Checked {len(pages)} pages: links, fragments and image assets passed.')
+
+# Calendar dates drive status and countdowns; reject ambiguous dates before publishing.
+import json
+from datetime import datetime
+calendar = json.loads((ROOT / 'competitions/data.json').read_text())
+seen = set()
+for event in calendar:
+    required = ('id', 'title', 'platform', 'chain', 'kind', 'start', 'end', 'reward', 'assets', 'rules', 'entry', 'lp', 'note', 'url', 'source', 'verified')
+    assert all(isinstance(event.get(k), str) and event[k] for k in required), 'Incomplete calendar entry'
+    assert event['id'] not in seen, 'Duplicate calendar ID'
+    seen.add(event['id'])
+    assert event['start'].endswith('Z') and event['end'].endswith('Z'), 'Use UTC dates'
+    assert datetime.fromisoformat(event['start']) < datetime.fromisoformat(event['end']), 'Invalid competition period'
+    assert event['kind'] in ('交易量赛', '盈利赛'), 'Unknown scoring method'
+    for key in ('url', 'source'):
+        assert urlsplit(event[key]).scheme == 'https' and urlsplit(event[key]).netloc, 'Invalid source URL'
+print(f'Checked {len(calendar)} calendar periods: required fields, UTC dates and sources passed.')
