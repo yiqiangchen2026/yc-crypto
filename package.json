@@ -1,0 +1,14 @@
+{
+  "name": "yc-crypto",
+  "version": "1.0.0",
+  "private": true,
+  "description": "YC 撸毛站：精选项目、完整攻略、免费分享",
+  "scripts": {
+    "dev": "python3 -m http.server 4317 --bind 127.0.0.1 --directory site",
+    "check": "python3 scripts/check_site.py",
+    "deploy": "npm run check && wrangler pages deploy site --project-name yc-crypto --branch main"
+  },
+  "devDependencies": {
+    "wrangler": "4.147.0"
+  }
+}
