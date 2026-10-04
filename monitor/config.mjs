@@ -18,5 +18,5 @@ export const TOKENS = Object.entries({
   AMZN:'0x12f190a9F9d7D37a250758b26824B97CE941bF54',
   CRCL:'0xdF0992E440dD0be65BD8439b609d6D4366bf1CB5'
 }).map(([symbol,address])=>({symbol,address:address.toLowerCase()}));
-export const RULES = { multiple:3, strongMultiple:5, min5m:5000, min1h:50000, minTrades5m:5, minTrades1h:20, minLiquidity:10000, baselineFloor5m:500, cooldownMinutes:60, rearmPolls:2 };
+export const RULES = { multiple:3, strongMultiple:5, min5m:15000, min1h:100000, minTrades5m:10, minTrades1h:30, strongMin5m:50000, strongMin1h:200000, minLiquidity:10000, baselineFloor5m:500, cooldownMinutes:60, rearmPolls:2 };
 export const SOURCE = 'https://api.dexscreener.com';

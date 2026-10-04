@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarize,transition,normalizePool} from './core.mjs';
+import {summarize,transition,normalizePool,alertText} from './core.mjs';
 import {scan} from './worker.mjs';
 import {TOKENS,USDG} from './config.mjs';
 const token=TOKENS[0];
@@ -13,14 +13,14 @@ test('match exact token contracts, including reverse pair; exclude ticker impers
  p.baseToken.address='0x'+'b'.repeat(40);assert.equal(normalizePool(p,token),null);
 });
 test('sum unique pools and exclude current 5m from baseline',()=>{
- const p=pool(),r=summarize(token,[p,p]);assert.equal(r.pools.length,1);assert.equal(r.baseline5m,3000);assert.equal(r.multiple,5);assert.equal(r.status,'strong');
+ const p=pool(),r=summarize(token,[p,p]);assert.equal(r.pools.length,1);assert.equal(r.baseline5m,3000);assert.equal(r.multiple,5);assert.equal(r.status,'rising');
 });
 test('low absolute volume and low liquidity cannot alert',()=>{
  const p=pool({m5:500,h1:500,h6:500,h24:500});assert.equal(summarize(token,[p]).status,'normal');
  const q=pool();q.liquidity.usd=500;assert.equal(summarize(token,[q]).status,'normal');
 });
 test('sustained volume triggers independently of short burst',()=>{
- const r=summarize(token,[pool({m5:1000,h1:60000,h6:110000,h24:200000})]);assert.equal(r.reason,'1h');assert.equal(r.status,'strong');
+ const r=summarize(token,[pool({m5:1000,h1:200000,h6:300000,h24:400000})]);assert.equal(r.reason,'1h');assert.equal(r.status,'strong');
 });
 test('missing fields and inconsistent rolling windows cannot produce false alerts',()=>{
  const p=pool();delete p.volume.h1;assert.throws(()=>summarize(token,[p]));
@@ -102,4 +102,11 @@ test('periodic ranking retries failed delivery, supports 24h, skips incomplete d
  await scan(env,async()=>{calls++;return Response.json({ok:true});},now+4*3600000,async()=>{},incomplete);assert.equal(calls,2);
  const inconsistent=rows(now+5*3600000);inconsistent[0].status='inconsistent';
  await scan(env,async()=>{calls++;return Response.json({ok:true});},now+5*3600000,async()=>{},inconsistent);assert.equal(calls,2);
+});
+test('early alerts require absolute volume and trades; strong requires substantial volume',()=>{
+ const q=pool({m5:18901,h1:36712,h6:60000,h24:100000});q.liquidity.usd=1280671;q.txns.m5={buys:10,sells:11};
+ const row=summarize(token,[q]);assert.equal(row.status,'rising');assert.equal(row.reason,'5m');assert.ok(alertText([row],'test').includes('2.9%'));
+ const low=pool({m5:14000,h1:14000,h6:14000,h24:14000});assert.equal(summarize(token,[low]).status,'normal');
+ const few=pool();few.txns.m5={buys:4,sells:5};assert.equal(summarize(token,[few]).status,'normal');
+ const strong=pool({m5:50000,h1:60000,h6:100000,h24:200000});assert.equal(summarize(token,[strong]).status,'strong');
 });
