@@ -1,0 +1,8 @@
+{
+  "name": "yc-volume-collector",
+  "main": "collector.mjs",
+  "compatibility_date": "2026-10-04",
+  "account_id": "1e48e927816f1c260c9085542a4f658f",
+  "workers_dev": false,
+  "preview_urls": false
+}
