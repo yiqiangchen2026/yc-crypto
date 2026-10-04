@@ -71,3 +71,14 @@ test('public API never exposes internal state or permits unauthenticated scans',
  const response=await worker.fetch(new Request('https://example.com/snapshot'),env);const body=await response.json();assert.equal(body.signals,undefined);assert.equal(body.scanningUntil,undefined);
  assert.equal((await worker.fetch(new Request('https://example.com/admin/scan',{method:'POST'}),env)).status,404);
 });
+test('ingestion requires its own key, rejects wrong contracts and stale replays',async()=>{
+ const worker=(await import('./worker.mjs')).default;let saved;
+ const env={INGEST_TOKEN:'test-ingestion-only',MONITOR:{get:async()=>saved,put:async(k,v)=>{saved=JSON.parse(v);}}};
+ const scannedAt=new Date().toISOString();
+ const rows=TOKENS.map(t=>({...t,status:'normal',volume:{m5:0,h1:0,h6:0,h24:0},liquidity:0,multiple:0,pools:[],updatedAt:scannedAt}));
+ const send=(payload,key='test-ingestion-only')=>worker.fetch(new Request('https://example.com/admin/ingest',{method:'POST',headers:{'Authorization':'Bearer '+key},body:JSON.stringify(payload)}),env);
+ assert.equal((await send({scannedAt,rows},'wrong')).status,404);
+ assert.equal((await send({scannedAt,rows:rows.map((r,i)=>i? r:{...r,address:USDG})})).status,400);
+ assert.equal((await send({scannedAt,rows})).status,200);assert.equal(saved.rows.length,16);
+ const replay=await send({scannedAt,rows});assert.equal((await replay.json()).accepted,false);
+});

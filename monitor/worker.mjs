@@ -1,6 +1,6 @@
 import {TOKENS,RULES} from './config.mjs';
 import {collect,transition,alertText} from './core.mjs';
-export async function scan(env, fetcher=fetch, now=Date.now(), pause=async()=>{}) {
+export async function scan(env, fetcher=fetch, now=Date.now(), pause=async()=>{}, providedRows=null) {
   let old=await env.MONITOR.get('state','json')||{rows:[],signals:{},events:[]};
   if (old.source!=='dexscreener') old={rows:[],signals:{},events:[],source:'dexscreener'};
   if ((old.scanningUntil||0)>now) return old;
@@ -8,7 +8,8 @@ export async function scan(env, fetcher=fetch, now=Date.now(), pause=async()=>{}
   await env.MONITOR.put('state',JSON.stringify({...old,scanningUntil:now+5*60000}));
   const timestamp=new Date(now).toISOString();
   const fresh=[];
-  if (env.COLLECTOR) {
+  if (providedRows) fresh.push(...providedRows);
+  else if (env.COLLECTOR) {
     // Keep global upstream concurrency at two, not eight across service calls.
     for (let batch=0;batch<4;batch++) {
       try {
@@ -55,6 +56,26 @@ export default {
   async scheduled(event,env,ctx) { ctx.waitUntil(scan(env)); },
   async fetch(request,env) {
     const url=new URL(request.url);
+    if (request.method==='POST'&&url.pathname==='/admin/ingest') {
+      if (!env.INGEST_TOKEN||request.headers.get('Authorization')!==`Bearer ${env.INGEST_TOKEN}`) return new Response('Not found',{status:404});
+      if (Number(request.headers.get('Content-Length')||0)>512000) return new Response('Too large',{status:413});
+      let body;
+      try {const text=await request.text();if(text.length>512000) return new Response('Too large',{status:413});body=JSON.parse(text);}
+      catch {return new Response('Invalid JSON',{status:400});}
+      const at=Date.parse(body.scannedAt);
+      if (!Number.isFinite(at)||Math.abs(Date.now()-at)>10*60000||!Array.isArray(body.rows)||body.rows.length!==TOKENS.length) return new Response('Invalid snapshot',{status:400});
+      const symbols=new Set();
+      for (const row of body.rows) {
+        const token=TOKENS.find(t=>t.symbol===row.symbol);
+        if (!token||token.address!==row.address||symbols.has(row.symbol)||!['normal','rising','strong','error','inconsistent','no-pool'].includes(row.status)) return new Response('Invalid pair',{status:400});
+        symbols.add(row.symbol);
+        if (row.status!=='error'&&(!row.volume||['m5','h1','h6','h24'].some(k=>!Number.isFinite(row.volume[k])||row.volume[k]<0)||!Number.isFinite(row.liquidity)||!Number.isFinite(row.multiple)||!Array.isArray(row.pools)||row.updatedAt!==body.scannedAt)) return new Response('Invalid metrics',{status:400});
+      }
+      const current=await env.MONITOR.get('state','json');
+      if (current?.source==='dexscreener'&&Date.parse(current.scannedAt)>=at) return Response.json({accepted:false,reason:'older-snapshot'});
+      const state=await scan(env,fetch,at,async()=>{},body.rows);
+      return Response.json({accepted:true,scannedAt:state.scannedAt,valid:state.rows.filter(r=>r.status!=='error').length,notification:state.notification},{headers:{'Cache-Control':'no-store'}});
+    }
     if (request.method==='POST'&&url.pathname==='/admin/scan') {
       if (!env.ADMIN_TOKEN||request.headers.get('Authorization')!==`Bearer ${env.ADMIN_TOKEN}`) return new Response('Not found',{status:404});
       const state=await scan(env);

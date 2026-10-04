@@ -1,0 +1,13 @@
+import {TOKENS} from '../monitor/config.mjs';
+import {collect} from '../monitor/core.mjs';
+const url=process.env.MONITOR_INGEST_URL,key=process.env.VOLUME_INGEST_TOKEN;
+if (!url||!key) throw new Error('Configure MONITOR_INGEST_URL and VOLUME_INGEST_TOKEN');
+const scannedAt=new Date().toISOString();
+const rows=await collect(TOKENS,fetch,scannedAt,()=>new Promise(resolve=>setTimeout(resolve,250)));
+const valid=rows.filter(r=>r.status!=='error').length;
+console.log(`Collected ${valid}/${TOKENS.length} pairs from DEX Screener.`);
+if (!valid) throw new Error('All upstream requests failed; retain existing snapshot');
+const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({scannedAt,rows}),signal:AbortSignal.timeout(25000)});
+if (!response.ok) throw new Error(`Snapshot ingestion failed (${response.status})`);
+const result=await response.json();console.log(JSON.stringify(result));
+if (result.notification==='error') throw new Error('Telegram send failed; next scan will retry');

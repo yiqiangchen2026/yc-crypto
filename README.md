@@ -70,31 +70,44 @@ npm run deploy
 
 ## 交易量监控 / Telegram
 
-`/volume/` 已集成到原站点，页面读取独立 Worker 缓存，不直接请求行情或暴露 Bot Token。后端为 `monitor/worker.mjs`，Cloudflare Cron 每5分钟扫描；每轮16次 DEX Screener 公共API请求，通过私有服务绑定分成4批，每批4个代币、两个并发，批次顺序执行、每批两组间隔2秒（每批独立CPU预算）。覆盖活动全部16个股票代币 / USDG，按活动合约匹配，合并去重后的池子。使用数据源原生5m、1h、6h和24h窗口，不估算15m成交额。
+`/volume/` 集成在原站点。页面读取 Cloudflare Worker 的缓存，不直接请求行情或暴露 Bot Token；后台接收新快照后计算提醒去重、写入KV并向频道发送信号。
+
+采集计划由公开仓库的 `.github/workflows/collect-volume.yml` 执行，标准GitHub-hosted Ubuntu runner免费，每5分钟计划一次，避开整点。GitHub调度为best effort，忙时可能延迟或漏跑，公开仓库60天无活动还可能自动停用schedule；因此页面显示采集时间，12分钟未更新则标记过期。若改成私有仓库，需要重新评估Actions分钟额度。本流程不上传artifact、不缓存行情文件，也不因每轮采集重新部署Pages。
+
+`node scripts/collect-volume.mjs` 通过 DEX Screener公共API请求活动全部16个股票代币，精确匹配活动合约与USDG合约，合并去重后的池子。每轮16请求、两个并发，使用原生5m、1h、6h、24h窗口，不估算15m成交额。原Cloudflare定时采集因共享出口限流不再启用；私有collector仅保留用于管理员手动诊断。
 
 - `monitor/config.mjs`：白名单、USDG合约、阈值。
-- `monitor/collector.mjs`：私有采集Worker，无公开URL、不持有TG密钥或KV。
 - `monitor/core.mjs`：行情解析、放量检测、提醒去重。
-- `monitor/wrangler.jsonc`：现有账号、KV绑定、定时任务与频道ID。
+- `monitor/worker.mjs`：快照接收、缓存、TG推送、公开只读接口。
+- `monitor/wrangler.jsonc`：现有账号、KV和频道ID；Cron为空。
+- `monitor/collector.mjs`：私有备用采集服务，不持有Bot密钥或KV。
 - `site/volume/config.json`：公开只读快照URL。
-- `npm run test:monitor`：风险边界测试；`npm run deploy:monitor`：发布后端。
-- 页面使用原 Pages 部署流程；Worker变更需要单独发布后端。
+- `npm run test:monitor`：风险边界及接口隔离测试；`npm run deploy:monitor`：发布后台。
+- 页面仍走原Pages自动部署；后端改动需要单独发布。
 
-默认上量：5m至少$5,000 / 5笔且达到前55m每5m均值3倍；或1h至少$50,000 / 20笔且达到前5h每小时均值3倍。5倍标为强放量；已知池流动性合计至少$10,000。5m基准下限$500、1h基准下限$6,000。每对提醒冷却60分钟，连续两轮正常后重新武装；冷却后升级为强放量也可再提醒。通知失败不记录为送达，下轮重试；数据异常保留旧值并停止对该交易对发信号。页面标记超过12分钟未更新的数据。
+默认上量：5m至少$5,000 / 5笔且达到前55m每5m均值3倍；或1h至少$50,000 / 20笔且达到前5h每小时均值3倍。5倍标为强放量；已知池流动性至少$10,000。基准下限为5m $500、1h $6,000。每对提醒冷却60分钟，连续两轮正常后重新武装；冷却后升级为强放量也可再提醒。通知失败不记录为送达，下轮重试；数据异常保留旧值并停止对该交易对发信号。
 
-流动性估值缺失的池子不计入流动性合计，但保留其完整成交额并标注；缺少成交额或笔数字段则视为异常。仅覆盖数据源索引到的池子，不保证覆盖所有链上池或活动专属流量；返回列表满100个时提示可能截断。趋势保存72个滚动5m采样点，最多6小时，不应当作互不重叠的窗口累加。最近40条成功通知保存在KV；公开API不返回内部去重状态或凭据。数据源缓存可能使检测滞后，公共API没有保证的可用性。
+流动性估值缺失的池子不计入流动性合计，但保留完整成交额并标注；缺少成交额或笔数字段则视为异常。只覆盖数据源索引到的池，不保证所有链上池或活动专属流量；列表满100个时提示可能截断。趋势保存最近72个滚动5m采样点，不应直接累加；最近40条成功通知保存在KV。公开API不返回内部去重状态或凭据。
 
-Telegram Bot必须成为指定频道管理员并拥有发布权限。Token用Cloudflare Secret保存，绝不写进前端、Git或工作流：
+### 密钥位置
+
+- Cloudflare `yc-volume-monitor` / `TG_BOT_TOKEN`：Bot API Key，加密Secret，仅后台发送TG时读取。前端和GitHub均无Bot Key。
+- Cloudflare `INGEST_TOKEN` 与GitHub仓库Secret `VOLUME_INGEST_TOKEN`：相同的独立随机行情写入凭据；只能通过 `/admin/ingest` 上传快照，不能读取Bot Key。接收端校验白名单合约、时效和重复快照。GitHub工作流读取它时自动掩码；任何密钥都不写进Git。
+- Cloudflare `ADMIN_TOKEN`：仅用于管理员手动扫描诊断，和行情写入密钥不同，不分发给GitHub。
+
+Bot必须是频道管理员并拥有发布权限。轮换Bot Key只改Cloudflare Secret：
 
 ```sh
 npx wrangler secret put TG_BOT_TOKEN --config monitor/wrangler.jsonc
 ```
 
-管理员手动采集接口为 `POST /admin/scan`，需独立Cloudflare `ADMIN_TOKEN` Secret作为Bearer授权，不放入前端。KV中的5分钟租约避免通常情况下手动与定时扫描重叠；KV为最终一致存储，不提供严格分布式锁，避免同时从不同区域手动触发。初次切换数据源时清空历史趋势及旧通知，以免不同统计口径混用。
+行情写入密钥轮换时同步Cloudflare `INGEST_TOKEN` 与GitHub `VOLUME_INGEST_TOKEN`。切勿把密钥放到 `site/volume/config.json` 或网页。
 
-免费预算：后台288轮/天，加4批私有采集共约1,440次Worker调用/天，KV写入通常576次/天、最坏每轮发信号时864次/天，低于1,000次/天（额外手动扫描另计）；上游4,608请求/天、16请求/轮。页面访问使用60秒公共缓存，但仍需与同账号其他Worker/KV共用的免费额度一起评估。KV读取与Worker请求免费上限各100,000/天，CPU免费上限10ms；访问量或工作负载超过额度可能失败，并非无限免费。本实现不启用付费计划，也不自动升级。
+免费预算：每天约288次计划采集；行情API约4,608请求/天。Cloudflare每次接收最多3次KV写入，通常576、最坏864写入/天，低于1,000次/天（手动触发另计）。页面响应缓存60秒，访客不触发行情扫描。Worker请求与KV读取各100,000/天，需要与同账号其他应用共用额度一起评估；CPU免费上限10ms。超额可能失败，本项目不启用付费计划，也不自动升级。
 
-官方额度与数据源：
+官方说明：
+https://docs.github.com/en/billing/concepts/product-billing/github-actions
+https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows
 https://developers.cloudflare.com/workers/platform/limits/
 https://developers.cloudflare.com/kv/platform/limits/
 https://docs.dexscreener.com/api/reference
