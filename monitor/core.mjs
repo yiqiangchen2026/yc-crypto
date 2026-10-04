@@ -69,3 +69,10 @@ export function alertText(rows, now) {
   return ['📈 YC 交易量监控｜上量提醒',...rows.map(r=>`${r.symbol}/USDG · ${r.status==='strong'?'强放量':'开始放量'}\n5m ${money(r.volume.m5)} · 1h ${money(r.volume.h1)} · ${r.multiple.toFixed(1)}×（${r.reason==='5m'?'前55m均值':'前5h均值'}）\n5m ${r.trades5m} 笔 · 流动性 ${money(r.liquidity)}`),
     `采集时间 ${now}（UTC）`,'Robinhood Chain · 已发现池合计，不等于活动计分量；请核实实际路由和 LP 风险。','https://yc-crypto.pages.dev/volume/'].join('\n\n');
 }
+
+export function summaryText(rows, now, window='h1') {
+  const top=[...rows].sort((a,b)=>b.volume[window]-a.volume[window]||a.symbol.localeCompare(b.symbol)).slice(0,3);
+  return ['🏆 YC 交易量监控｜定时 Top 3',`按过去${window==='h24'?'24':'1'}小时成交量排名（USD）`,
+    ...top.map((r,i)=>`${i+1}. ${r.symbol}/USDG${['rising','strong'].includes(r.status)?' · 放量中':''}\n5m ${money(r.volume.m5)} · 1h ${money(r.volume.h1)} · 24h ${money(r.volume.h24)}\n已知流动性 ${money(r.liquidity)}`),
+    `采集时间 ${now}（UTC）`,'Robinhood Chain · 已发现池合计，不等于活动计分量。','https://yc-crypto.pages.dev/volume/'].join('\n\n');
+}

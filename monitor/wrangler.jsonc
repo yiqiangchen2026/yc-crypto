@@ -6,6 +6,6 @@
   "workers_dev": true,
   "services": [{"binding":"COLLECTOR", "service":"yc-volume-collector"}],
   "triggers": { "crons": [] },
-  "vars": { "SITE_ORIGIN": "https://yc-crypto.pages.dev", "TG_CHANNEL_ID": "-1004450250306" },
+  "vars": { "SITE_ORIGIN": "https://yc-crypto.pages.dev", "TG_CHANNEL_ID": "-1004450250306", "SUMMARY_INTERVAL_HOURS": "6", "SUMMARY_WINDOW": "h1" },
   "kv_namespaces": [{ "binding": "MONITOR", "id": "d17f21fa76b14ac4ab802715f0b351e9" }]
 }

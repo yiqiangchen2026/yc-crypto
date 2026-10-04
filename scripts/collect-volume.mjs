@@ -7,7 +7,7 @@ const rows=await collect(TOKENS,fetch,scannedAt,()=>new Promise(resolve=>setTime
 const valid=rows.filter(r=>r.status!=='error').length;
 console.log(`Collected ${valid}/${TOKENS.length} pairs from DEX Screener.`);
 if (!valid) throw new Error('All upstream requests failed; retain existing snapshot');
-const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','User-Agent':'YC-Volume-Monitor/1.0','Authorization':`Bearer ${key}`},body:JSON.stringify({scannedAt,rows}),signal:AbortSignal.timeout(25000)});
+const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','User-Agent':'YC-Volume-Monitor/1.0','Authorization':`Bearer ${key}`},body:JSON.stringify({scannedAt,rows}),signal:AbortSignal.timeout(40000)});
 if (!response.ok) throw new Error(`Snapshot ingestion failed (${response.status})`);
 const result=await response.json();console.log(JSON.stringify(result));
-if (result.notification==='error') throw new Error('Telegram send failed; next scan will retry');
+if (result.notification==='error'||result.summaryNotification==='error') throw new Error('Telegram send failed; next scan will retry');

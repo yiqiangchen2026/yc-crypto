@@ -82,3 +82,24 @@ test('ingestion requires its own key, rejects wrong contracts and stale replays'
  assert.equal((await send({scannedAt,rows})).status,200);assert.equal(saved.rows.length,16);
  const replay=await send({scannedAt,rows});assert.equal((await replay.json()).accepted,false);
 });
+test('periodic ranking sends without alerts, waits six hours, and survives state updates',async()=>{
+ let saved,calls=[];const now=Date.parse('2026-10-05T00:00:00Z');
+ const env={SUMMARY_INTERVAL_HOURS:'6',SUMMARY_WINDOW:'h1',TG_BOT_TOKEN:'test-only',TG_CHANNEL_ID:'test',MONITOR:{get:async()=>saved,put:async(k,v)=>{saved=JSON.parse(v);}}};
+ const rows=at=>TOKENS.map((t,i)=>({...t,status:'normal',volume:{m5:0,h1:i*100,h6:i*100,h24:(16-i)*1000},liquidity:10000,updatedAt:new Date(at).toISOString()}));
+ const fetcher=async(url,init)=>{calls.push(JSON.parse(init.body).text);return Response.json({ok:true});};
+ await scan(env,fetcher,now,async()=>{},rows(now));
+ assert.equal(calls.length,1);assert.ok(calls[0].includes(`1. ${TOKENS[15].symbol}/USDG`));assert.equal(saved.events.length,0);
+ await scan(env,fetcher,now+5*3600000,async()=>{},rows(now+5*3600000));assert.equal(calls.length,1);
+ await scan(env,fetcher,now+6*3600000,async()=>{},rows(now+6*3600000));assert.equal(calls.length,2);assert.equal(saved.lastSummaryAt,now+6*3600000);
+});
+test('periodic ranking retries failed delivery, supports 24h, skips incomplete data',async()=>{
+ let saved,calls=0;const now=Date.parse('2026-10-05T00:00:00Z');
+ const env={SUMMARY_INTERVAL_HOURS:'3',SUMMARY_WINDOW:'h24',TG_BOT_TOKEN:'test-only',TG_CHANNEL_ID:'test',MONITOR:{get:async()=>saved,put:async(k,v)=>{saved=JSON.parse(v);}}};
+ const rows=at=>TOKENS.map((t,i)=>({...t,status:'normal',volume:{m5:0,h1:i*100,h6:i*100,h24:(16-i)*1000},liquidity:10000,updatedAt:new Date(at).toISOString()}));
+ await scan(env,async()=>{calls++;return Response.json({ok:false});},now,async()=>{},rows(now));assert.equal(saved.lastSummaryAt,0);assert.equal(saved.summaryNotification,'error');
+ await scan(env,async(url,init)=>{calls++;assert.ok(JSON.parse(init.body).text.includes(`1. ${TOKENS[0].symbol}/USDG`));return Response.json({ok:true});},now+300000,async()=>{},rows(now+300000));assert.equal(calls,2);assert.equal(saved.summaryNotification,'ok');
+ const incomplete=rows(now+4*3600000);incomplete[0].status='error';
+ await scan(env,async()=>{calls++;return Response.json({ok:true});},now+4*3600000,async()=>{},incomplete);assert.equal(calls,2);
+ const inconsistent=rows(now+5*3600000);inconsistent[0].status='inconsistent';
+ await scan(env,async()=>{calls++;return Response.json({ok:true});},now+5*3600000,async()=>{},inconsistent);assert.equal(calls,2);
+});
