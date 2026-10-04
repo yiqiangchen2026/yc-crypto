@@ -23,7 +23,7 @@
     $('total-24h').textContent=valid.length?fmt(valid.reduce((n,r)=>n+r.volume.h24,0)):'—';
     $('health').textContent=stale?'● 数据已过期':valid.length===rows.length?'● 监控运行中':`● 部分数据异常 (${valid.length}/${rows.length})`;
     $('updated').textContent=`采集：${time(snapshot.scannedAt)} · 本地时间`;
-    $('notice').textContent=stale?'数据已超过 12 分钟未更新，暂勿依据放量状态操作。':valid.length<rows.length?'部分交易对数据异常，旧值已标注且不计入概览；其余交易对继续监控。':'每 5 分钟检测一次；全站共用缓存，刷新页面不会触发行情扫描。';
+    $('notice').textContent=stale?'数据已超过 12 分钟未更新，暂勿依据放量状态操作。':valid.length<rows.length?'部分交易对数据异常，旧值已标注且不计入概览；其余交易对继续监控。':'每 5 分钟计划采集，GitHub 调度可能延迟；全站共用缓存，刷新页面不会触发行情扫描。';
     $('tg-status').textContent=snapshot.notification==='ok'?'TG 提醒已送达':snapshot.notification==='error'?'TG 发送失败，下一轮重试':'TG 等待首次提醒';
     const key=$('sort').value;
     const rank={strong:3,rising:2,normal:1};

@@ -53,7 +53,7 @@ export async function scan(env, fetcher=fetch, now=Date.now(), pause=async()=>{}
   return state;
 }
 export default {
-  async scheduled(event,env,ctx) { ctx.waitUntil(scan(env)); },
+  async scheduled() { /* Ignore old Cron events while trigger removal propagates. */ },
   async fetch(request,env) {
     const url=new URL(request.url);
     if (request.method==='POST'&&url.pathname==='/admin/ingest') {
