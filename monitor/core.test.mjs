@@ -110,3 +110,18 @@ test('early alerts require absolute volume and trades; strong requires substanti
  const few=pool();few.txns.m5={buys:4,sells:5};assert.equal(summarize(token,[few]).status,'normal');
  const strong=pool({m5:50000,h1:60000,h6:100000,h24:200000});assert.equal(summarize(token,[strong]).status,'strong');
 });
+
+test('each scan uses two KV writes even with a summary or failed notification',async()=>{
+ let saved,writes=0;
+ const now=Date.parse('2026-10-05T00:00:00Z');
+ const env={TG_BOT_TOKEN:'test-only',TG_CHANNEL_ID:'test',SUMMARY_INTERVAL_HOURS:'6',MONITOR:{get:async()=>saved,put:async(k,v)=>{writes++;saved=JSON.parse(v);}}};
+ const rows=at=>TOKENS.map(t=>({...t,status:'normal',volume:{m5:0,h1:1,h6:1,h24:1},liquidity:10000,updatedAt:new Date(at).toISOString()}));
+ await scan(env,async()=>Response.json({ok:false}),now,async()=>{},rows(now));
+ assert.equal(writes,2);assert.equal(saved.summaryNotification,'error');assert.equal(saved.lastSummaryAt,0);
+ writes=0;
+ await scan(env,async()=>Response.json({ok:true}),now+300000,async()=>{},rows(now+300000));
+ assert.equal(writes,2);assert.equal(saved.summaryNotification,'ok');assert.equal(saved.lastSummaryAt,now+300000);
+ writes=0;
+ await scan(env,async()=>{throw Error('unexpected send');},now+600000,async()=>{},rows(now+600000));
+ assert.equal(writes,2);assert.equal(saved.scannedAt,new Date(now+600000).toISOString());assert.equal(saved.scanningUntil,undefined);
+});

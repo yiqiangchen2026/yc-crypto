@@ -32,13 +32,15 @@ export async function scan(env, fetcher=fetch, now=Date.now(), pause=async()=>{}
     return {...row,history,source:'dexscreener'};
   });
   const state={source:'dexscreener',rows,signals,events:old.events||[],scannedAt:timestamp,notification:old.notification||'not-configured',lastSummaryAt:old.lastSummaryAt||0,summaryNotification:old.summaryNotification||'not-configured'};
-  await env.MONITOR.put('state',JSON.stringify(state));
   const hours=Number(env.SUMMARY_INTERVAL_HOURS);
   const window=env.SUMMARY_WINDOW==='h24'?'h24':'h1';
   // Only complete fresh snapshots can establish the ranking across the whitelist.
   const complete=rows.length===TOKENS.length&&rows.every(r=>!['error','inconsistent'].includes(r.status)&&!r.stale&&r.updatedAt===timestamp);
   const summaryDue=[3,6].includes(hours)&&complete&&now-state.lastSummaryAt>=hours*3600000;
-  if (!env.TG_BOT_TOKEN||!env.TG_CHANNEL_ID||(!alerts.length&&!summaryDue)) return state;
+  if (!env.TG_BOT_TOKEN||!env.TG_CHANNEL_ID||(!alerts.length&&!summaryDue)) {
+    await env.MONITOR.put('state',JSON.stringify(state));
+    return state;
+  }
   const send=async text=>{
     const response=await fetcher(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`,{
       method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(12000),
