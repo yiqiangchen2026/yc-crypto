@@ -1,9 +1,9 @@
 name: Check volume monitor
 on:
   push:
-    paths: ['monitor/**', '.github/workflows/check-monitor.yml']
+    paths: ['monitor/**', 'stock-monitor/**', '.github/workflows/check-monitor.yml']
   pull_request:
-    paths: ['monitor/**', 'site/volume/**', 'package*.json', '.github/workflows/check-monitor.yml']
+    paths: ['monitor/**', 'stock-monitor/**', 'site/volume/**', 'site/monitor/**', 'package*.json', '.github/workflows/check-monitor.yml']
 permissions:
   contents: read
 jobs:

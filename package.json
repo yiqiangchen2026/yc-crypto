@@ -7,8 +7,8 @@
     "dev": "python3 -m http.server 4317 --bind 127.0.0.1 --directory site",
     "check": "python3 scripts/check_site.py",
     "deploy": "npm run check && wrangler pages deploy site --project-name yc-crypto --branch main",
-    "test:monitor": "node --test monitor/core.test.mjs",
-    "deploy:monitor": "wrangler deploy --config monitor/collector.wrangler.jsonc && wrangler deploy --config monitor/wrangler.jsonc"
+    "test:monitor": "node --test monitor/*.test.mjs stock-monitor/*.test.mjs",
+    "deploy:monitor": "wrangler deploy --config monitor/wrangler.jsonc && wrangler d1 migrations apply yc-stock-monitor --remote --config stock-monitor/wrangler.jsonc && wrangler deploy --config stock-monitor/wrangler.jsonc"
   },
   "devDependencies": {
     "wrangler": "4.147.0"

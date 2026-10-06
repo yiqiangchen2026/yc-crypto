@@ -39,7 +39,7 @@ GitHub Actions 工作流 `.github/workflows/deploy.yml` 会在 `main` 的网站�
 
 首次启用需要在仓库 Settings → Secrets and variables → Actions 配置仓库 Secret：
 
-- `CLOUDFLARE_API_TOKEN`：Cloudflare API Token，赋予所属账号的 `Account → Cloudflare Pages → Edit` 权限；账号范围限定为托管该网站的账号。
+- `CLOUDFLARE_API_TOKEN`：Cloudflare Pages 发布凭据；账号范围限定为托管该网站的账号。后台工作流优先使用 `CLOUDFLARE_WORKERS_API_TOKEN`，未配置时复用此 Token。后台凭据需要同一账号的 Workers Scripts Edit、D1 Edit、Queues Edit，以及 Account Settings Read 等 Wrangler 所需权限；不需要 OKX 或 TG 密钥。
 
 账号 ID 是公开部署标识，已写在工作流中。Token 必须保存在 Secret 中，不能提交到仓库。未配置 Token 时工作流会明确失败，不会发布。
 
@@ -70,7 +70,7 @@ npm run deploy
 
 ## 交易量监控 / Telegram
 
-`/volume/` 集成在原站点。页面读取 Cloudflare Worker 的缓存，不直接请求行情或暴露 Bot Token；后台接收新快照后计算提醒去重、写入KV并向频道发送信号。
+`/monitor/` 是监控入口，下设 `/monitor/stocks/` 股票价差和 `/monitor/volume/` 交易量监控，原 `/volume/` 页面保留兼容。两个页面复用全站主题及 `site/monitor/monitor.css`。页面读取 Cloudflare Worker 的缓存，不直接请求行情或暴露 Bot Token；后台接收新快照后计算提醒去重、写入KV并向频道发送信号。
 
 采集计划由公开仓库的 `.github/workflows/collect-volume.yml` 执行，标准GitHub-hosted Ubuntu runner免费，每5分钟计划一次，避开整点。GitHub调度为best effort，忙时可能延迟或漏跑，公开仓库60天无活动还可能自动停用schedule；因此页面显示采集时间，12分钟未更新则标记过期。若改成私有仓库，需要重新评估Actions分钟额度。本流程不上传artifact、不缓存行情文件，也不因每轮采集重新部署Pages。
 
@@ -83,7 +83,7 @@ npm run deploy
 - `monitor/collector.mjs`：私有备用采集服务，不持有Bot密钥或KV。
 - `site/volume/config.json`：公开只读快照URL。
 - `npm run test:monitor`：风险边界及接口隔离测试；`npm run deploy:monitor`：发布后台。
-- 页面仍走原Pages自动部署；后端改动需要单独发布。
+- 页面仍走原Pages自动部署；两个监控后台的改动由 `.github/workflows/deploy-monitors.yml` 自动测试和发布。
 
 默认上量：5m至少$15,000 / 10笔且达到前55m每5m均值3倍；或1h至少$100,000 / 30笔且达到前5h每小时均值3倍。满足上述任一条件且至少5倍，并且5m至少$50,000或1h至少$200,000，才标为强放量；已知池流动性至少$10,000。基准下限为5m $500、1h $6,000。无需连续两轮确认即可触发。通知附1h成交量/已知流动性，仅供观察、不作过滤；流动性缺失时标注不完整。每对提醒冷却60分钟，连续两轮正常后重新武装；冷却后升级为强放量也可再提醒。通知失败不记录为送达，下轮重试；数据异常保留旧值并停止对该交易对发信号。
 
@@ -122,3 +122,22 @@ https://docs.dexscreener.com/api/reference
 - `site/market-clock/clock.js` / `clock.css`：时钟卡片，复用全站深浅色主题。
 
 沿用原时段、夏令时、节假日和半日市逻辑。港股节假日覆盖 2026–2027 年，港股半日市覆盖 2026 年；跨年需维护日历，临时停市不自动识别。原项目的页面暂保留。
+
+## 股票价差监控
+
+页面 `/monitor/stocks/` 每分钟读取独立 `yc-stock-monitor` Worker 的 `/snapshot` 市场快照，不包含调频、手动扫描或启停按钮。后台仍每 3 分钟扫描 39 个 X Layer 股票交易对，$500 复核；2% 折价、两次且至少 180 秒确认、90 分钟冷却与 1.8% 重置门槛保持不变。9 分钟未更新时标记过期。该后台在本仓库 `stock-monitor/` 维护，GitHub 自动发布；Onchain Desk 停止股票调度并通过服务绑定读取新后台，其旧公开地址保留兼容代理。
+
+股票价差与交易量放量通知共用「YC 链上信号」频道，统一标题、指标区、UTC 采集时间、链与口径说明以及独立页面链接。股票公开接口只返回允许的市场字段，私有钱包和内部状态仍受原鉴权保护。
+
+## 两个监控后台自动部署
+
+推送 `main` 的 `monitor/**`、`stock-monitor/**`、包配置或部署工作流修改，会触发 `Deploy monitor Workers`。流程先测试两个监控，再发布交易量 Worker 的内部股票通知入口、应用股票 D1 schema、发布股票 Worker，最后验证两个公开快照。网站继续由 `Deploy to Cloudflare Pages` 发布；无需每轮行情重发网站。
+
+- `yc-volume-monitor`：现有 KV 与采集流程保持不变；`StockNotifier` 是仅服务绑定可调用的通知入口，固定向现有「YC 链上信号」频道发送，无公开通知 HTTP 接口。TG Secret 仍只在此 Worker。
+- `yc-stock-monitor`：独立 D1 数据库 `yc-stock-monitor`，专用单并发 `yc-stock-scan` Queue，每 3 分钟 Cron 投递任务，过期任务和成功执行过的时间槽跳过。无公开手动扫描或配置接口。
+- `stock-monitor/core.mjs`：移植的 39 对股票折价引擎；`market-clock.mjs` 保留行情时效和市场日历判断。
+- `stock-monitor/storage.mjs`：行情、乘数与确认/冷却状态，使用 D1 避免每轮 KV 写入；`/health` 提供不含凭据的受控执行状态。
+- OKX 三项行情凭据使用新 Worker 的加密 Secrets。由于沿用同一个 OKX API Key，`HISTORY_DB` 绑定只用于既有 `api_request_slots` 的共享账户请求限速；股票状态已经独立，不读取钱包数据。将来若给股票监控独立的 OKX Key，可同时解除共享限速存储依赖。
+- 迁移数据只复制 `xstock-discount-monitor-v1`，包含乘数、连续确认、冷却及待汇总状态；不提交状态备份或密钥到 GitHub。先暂停旧调度并等待旧任务排空，再复制最终状态并启用新调度。回滚时先暂停新后台，再将其最新状态迁回旧后台；不可直接启用旧冻结状态，否则可能重复提醒。
+
+新后台首次资源配置使用 Wrangler 引导；后续代码发布走 GitHub。Secrets 在 Cloudflare 保留，自动部署不会把它们上传到 GitHub。`SCAN_ENABLED` 是生产调度开关；迁移准备版本设为 false，完成切换后设为 true。

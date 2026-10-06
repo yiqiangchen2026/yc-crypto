@@ -1,6 +1,6 @@
 {
   "name": "yc-volume-monitor",
-  "main": "worker.mjs",
+  "main": "entry.mjs",
   "compatibility_date": "2026-10-04",
   "account_id": "1e48e927816f1c260c9085542a4f658f",
   "workers_dev": true,
