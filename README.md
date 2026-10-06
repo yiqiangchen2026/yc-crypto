@@ -158,6 +158,6 @@ https://docs.dexscreener.com/api/reference
 
 `USDG_SCAN_ENABLED` 控制自动扫描和频道推送。`/usdg/health` 公开受控执行状态；`/usdg/snapshot` 仅输出报价白名单字段。没有公开手动扫描、配置或通知接口。频道推送通过现有服务绑定 `StockNotifier.sendUsdg`，固定目的频道，Bot 密钥仍仅在交易量后台。
 
-切换：先部署新模块且保持关闭；旧 Onchain Desk 新增 `USDG_SCAN_ENABLED=false`，同时拦截旧排队扫描；等待旧 USDG 状态稳定，再复制 `usdg-usdc-quote-alert-v2` 和最后成功报价至新 D1，之后启用新调度。本次最终旧状态 `active=false`，没有待确认或冷却时间戳；按原值迁移，未人为添加或重置。旧监控中心改为读取新后台 `/usdg/health` 和 `/usdg/snapshot` 并链接新页面。Onchain Desk 的手动 `/usdg` 查询和本机 2 秒高速监控继续保留。回滚前先停新调度，等任务排空，将新状态迁回旧库后才开启旧调度，避免重复提醒。
+切换：先部署新模块且保持关闭；旧 Onchain Desk 新增 `USDG_SCAN_ENABLED=false`，同时拦截旧排队扫描；等待旧 USDG 状态稳定，再复制 `usdg-usdc-quote-alert-v2` 和最后成功报价至新 D1，之后启用新调度。本次最终旧状态 `active=false`，没有待确认或冷却时间戳；按原值迁移，未人为添加或重置。旧监控中心改为读取新后台 `/usdg/health` 和 `/usdg/snapshot` 并链接新页面。Onchain Desk 的手动 `/usdg` 查询保留；本机 2 秒高速监控已于 2026-10-07 按要求移除并重新部署本地服务。回滚前先停新调度，等任务排空，将新状态迁回旧库后才开启旧调度，避免重复提醒。
 
 `npm run test:monitor` 包含 USDG 规则、迁移、调度、去重、异常保留旧报价及通知边界测试。USDG 修改已纳入 GitHub 后台自动测试、部署工作流，前端继续使用原 Cloudflare Pages 自动部署。
