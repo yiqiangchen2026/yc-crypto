@@ -5,6 +5,7 @@ on:
     paths:
       - 'monitor/**'
       - 'stock-monitor/**'
+      - 'usdg-monitor/**'
       - 'package*.json'
       - '.github/workflows/deploy-monitors.yml'
   workflow_dispatch:
@@ -23,7 +24,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Test both monitors and notification boundary
+      - name: Test monitors and notification boundary
         run: npm run test:monitor
       - name: Check deployment credentials
         env:
@@ -45,4 +46,6 @@ jobs:
         run: |
           curl --fail --retry 3 https://yc-stock-monitor.xlayer-wallet-report-worker.workers.dev/snapshot -o /tmp/stocks.json
           curl --fail --retry 3 https://yc-volume-monitor.xlayer-wallet-report-worker.workers.dev/snapshot -o /tmp/volume.json
+          curl --fail --retry 3 https://yc-stock-monitor.xlayer-wallet-report-worker.workers.dev/usdg/snapshot -o /tmp/usdg.json
+          node -e 'const u = require("/tmp/usdg.json"); if (!u.enabled || !Number.isFinite(u.quote?.grossEdgeRate)) throw Error("USDG snapshot unavailable");'
           node -e 'for (const f of ["stocks", "volume"]) { const s = require(`/tmp/${f}.json`); if (!Array.isArray(s.rows) || !s.rows.length) throw Error(`${f} snapshot unavailable`); }'

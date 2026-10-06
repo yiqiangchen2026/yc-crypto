@@ -149,3 +149,15 @@ https://docs.dexscreener.com/api/reference
 后台部署专用 Token 已配置在本仓库 `CLOUDFLARE_WORKERS_API_TOKEN` 加密 Secret，网站继续使用原 `CLOUDFLARE_API_TOKEN`。2026-10-06 后台自动部署已完成成功验证：https://github.com/yiqiangchen2026/yc-crypto/actions/runs/37446299315 。
 
 2026-10-06 重新核对时，新 Worker 已自然写入 `lastCronAt` 并完成扫描，说明此前的短期观测未能证明持续故障。Onchain Desk 的临时容错生产者绑定和调度代码已移除，股票定时投递不再依赖旧 Worker。每分钟唤醒、每 3 分钟投递的生产频率保持不变。新 Cron 从何时开始生效及先前延迟的具体平台原因未由现有记录确认，不能把推测写成根因。
+
+## USDG-USDC 候选价差（2026-10-07 迁移）
+
+`/monitor/usdg/` 为第三个监控模块，页面每分钟读取 `yc-stock-monitor` 的 `/usdg/snapshot`，9 分钟未更新标记过期。USDG 模块在 `usdg-monitor/` 独立维护，复用撸毛站股票后台的 OKX 加密凭据、D1、单并发 Queue 和频道通知服务，不再由 Onchain Desk 自动扫描或推送。股票在 UTC 分钟 `minute % 3 === 0` 扫描；USDG 在 `minute % 3 === 1` 扫描。两者各每 3 分钟，排队可能延迟；USDG 使用独立状态和健康记录，不覆盖股票状态。
+
+保留原逻辑：5,000 USDC → USDG、0.01% 毛差门槛、两轮候选确认、PendleSwap 0.01% 滑点预览复核且最低到账超过本金、10 分钟冷却和回落重新武装。毛差按 1:1 计算，不代表净利润。候选初筛与 Pendle 复核报价在页面明确区分；未复核不显示最低到账。
+
+`USDG_SCAN_ENABLED` 控制自动扫描和频道推送。`/usdg/health` 公开受控执行状态；`/usdg/snapshot` 仅输出报价白名单字段。没有公开手动扫描、配置或通知接口。频道推送通过现有服务绑定 `StockNotifier.sendUsdg`，固定目的频道，Bot 密钥仍仅在交易量后台。
+
+切换：先部署新模块且保持关闭；旧 Onchain Desk 新增 `USDG_SCAN_ENABLED=false`，同时拦截旧排队扫描；等待旧 USDG 状态稳定，再复制 `usdg-usdc-quote-alert-v2` 和最后成功报价至新 D1，之后启用新调度。本次最终旧状态 `active=false`，没有待确认或冷却时间戳；按原值迁移，未人为添加或重置。旧监控中心改为读取新后台 `/usdg/health` 和 `/usdg/snapshot` 并链接新页面。Onchain Desk 的手动 `/usdg` 查询和本机 2 秒高速监控继续保留。回滚前先停新调度，等任务排空，将新状态迁回旧库后才开启旧调度，避免重复提醒。
+
+`npm run test:monitor` 包含 USDG 规则、迁移、调度、去重、异常保留旧报价及通知边界测试。USDG 修改已纳入 GitHub 后台自动测试、部署工作流，前端继续使用原 Cloudflare Pages 自动部署。

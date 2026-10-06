@@ -1,9 +1,9 @@
 name: Check monitors
 on:
   push:
-    paths: ['monitor/**', 'stock-monitor/**', '.github/workflows/check-monitor.yml']
+    paths: ['monitor/**', 'stock-monitor/**', 'usdg-monitor/**', '.github/workflows/check-monitor.yml']
   pull_request:
-    paths: ['monitor/**', 'stock-monitor/**', 'site/volume/**', 'site/monitor/**', 'package*.json', '.github/workflows/check-monitor.yml']
+    paths: ['monitor/**', 'stock-monitor/**', 'usdg-monitor/**', 'site/volume/**', 'site/monitor/**', 'package*.json', '.github/workflows/check-monitor.yml']
 permissions:
   contents: read
 jobs:

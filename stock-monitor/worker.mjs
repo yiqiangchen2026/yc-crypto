@@ -1,6 +1,7 @@
 import { runXStockMonitor } from './core.mjs';
 import { createOkxClient } from './okx-client.mjs';
 import { STATE_KEY, stateStore, publicSnapshot, recordScan } from './storage.mjs';
+import { processUsdgScan, usdgResponse } from '../usdg-monitor/worker.mjs';
 export async function processScan(env, requestedAt, now = Date.now(), run = runXStockMonitor) {
   if (env.SCAN_ENABLED !== 'true') return { skipped:'disabled' };
   if (!Number.isFinite(requestedAt) || requestedAt > now + 60000 || now-requestedAt > 6*60000) return { skipped:'expired' };
@@ -24,6 +25,12 @@ export async function processScan(env, requestedAt, now = Date.now(), run = runX
 }
 export default {
   async scheduled(controller, env, ctx) {
+    if (env.USDG_SCAN_ENABLED === 'true' && new Date(controller.scheduledTime).getUTCMinutes() % 3 === 1) {
+      ctx.waitUntil((async () => {
+        await env.SCAN_QUEUE.send({ kind:'usdg-scan',requestedAt:controller.scheduledTime });
+        await stateStore(env.STOCK_DB).put('usdg-cron-v1',JSON.stringify({at:Date.now()}));
+      })());
+    }
     if (env.SCAN_ENABLED !== 'true' || new Date(controller.scheduledTime).getUTCMinutes() % 3 !== 0) return;
     ctx.waitUntil((async () => {
       await env.SCAN_QUEUE.send({ kind:'stock-scan',requestedAt:controller.scheduledTime });
@@ -35,6 +42,7 @@ export default {
     for (const message of batch.messages) {
       try {
         if (message.body?.kind === 'stock-scan') await processScan(env,message.body.requestedAt);
+        if (message.body?.kind === 'usdg-scan') await processUsdgScan(env,message.body.requestedAt);
       } catch { console.error(JSON.stringify({event:'stock_scan_failed'})); }
       // Next scheduled scan rechecks failed deliveries without replaying stale prices.
       message.ack();
@@ -44,8 +52,9 @@ export default {
     const path = new URL(request.url).pathname;
     const headers = { 'Cache-Control':'public, max-age=60','Access-Control-Allow-Origin':env.SITE_ORIGIN,
       'X-Content-Type-Options':'nosniff' };
-    if (request.method !== 'GET' || !['/snapshot','/health'].includes(path)) return new Response('Not found',{status:404});
+    if (request.method !== 'GET' || !['/snapshot','/health','/usdg/snapshot','/usdg/health'].includes(path)) return new Response('Not found',{status:404});
     try {
+      if (path.startsWith('/usdg/')) return await usdgResponse(path,env,headers);
       if (path === '/health') {
         const row = await env.STOCK_DB.prepare('SELECT * FROM scan_runs WHERE id=1').first();
         const cron = await stateStore(env.STOCK_DB).get('stock-cron-v1','json');
