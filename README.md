@@ -141,3 +141,7 @@ https://docs.dexscreener.com/api/reference
 - 迁移数据只复制 `xstock-discount-monitor-v1`，包含乘数、连续确认、冷却及待汇总状态；不提交状态备份或密钥到 GitHub。先暂停旧调度并等待旧任务排空，再复制最终状态并启用新调度。回滚时先暂停新后台，再将其最新状态迁回旧后台；不可直接启用旧冻结状态，否则可能重复提醒。
 
 新后台首次资源配置使用 Wrangler 引导；后续代码发布走 GitHub。Secrets 在 Cloudflare 保留，自动部署不会把它们上传到 GitHub。`SCAN_ENABLED` 是生产调度开关；迁移准备版本设为 false，完成切换后设为 true。
+
+### 2026-10-06 切换记录
+
+旧 Onchain Desk 股票调度和旧频道推送已停用，独立股票状态从最终冻结快照迁移，保留 39 个乘数及 24 个交易对的确认/冷却记录。新配置开启 `SCAN_ENABLED=true`，网站改为读取独立 `/snapshot`；旧 `/api/public/xstocks` 继续代理新快照。初次新资源引导使用本机 Wrangler；后续自动部署在本仓库执行。
