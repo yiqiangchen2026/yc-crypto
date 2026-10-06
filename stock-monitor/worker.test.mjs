@@ -48,3 +48,15 @@ test('public stock API is read-only and omits migrated internal state',async()=>
  assert.deepEqual((await r.json()).rows,[{symbol:'AAPLx'}]);
  assert.equal((await worker.fetch(new Request('https://stock.test/admin/scan',{method:'POST'}),env)).status,404);db.close();
 });
+
+test('minute heartbeat schedules scans only every three minutes and reports successful cron delivery',async()=>{
+ const {db,env}=setup();let sent=[],pending=[];
+ env.SCAN_QUEUE={send:async job=>sent.push(job)};
+ const ctx={waitUntil:promise=>pending.push(promise)};
+ await worker.scheduled({scheduledTime:Date.parse('2026-10-06T10:21:00Z')},env,ctx);
+ await Promise.all(pending);assert.equal(sent.length,1);
+ await worker.scheduled({scheduledTime:Date.parse('2026-10-06T10:22:00Z')},env,ctx);
+ assert.equal(sent.length,1);
+ const health=await (await worker.fetch(new Request('https://stock.test/health'),env)).json();
+ assert.ok(health.lastCronAt);db.close();
+});

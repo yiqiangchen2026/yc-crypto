@@ -134,7 +134,7 @@ https://docs.dexscreener.com/api/reference
 推送 `main` 的 `monitor/**`、`stock-monitor/**`、包配置或部署工作流修改，会触发 `Deploy monitor Workers`。流程先测试两个监控，再发布交易量 Worker 的内部股票通知入口、应用股票 D1 schema、发布股票 Worker，最后验证两个公开快照。网站继续由 `Deploy to Cloudflare Pages` 发布；无需每轮行情重发网站。
 
 - `yc-volume-monitor`：现有 KV 与采集流程保持不变；`StockNotifier` 是仅服务绑定可调用的通知入口，固定向现有「YC 链上信号」频道发送，无公开通知 HTTP 接口。TG Secret 仍只在此 Worker。
-- `yc-stock-monitor`：独立 D1 数据库 `yc-stock-monitor`，专用单并发 `yc-stock-scan` Queue，每 3 分钟 Cron 投递任务，过期任务和成功执行过的时间槽跳过。无公开手动扫描或配置接口。
+- `yc-stock-monitor`：独立 D1 数据库 `yc-stock-monitor`，专用单并发 `yc-stock-scan` Queue，每分钟 Cron 唤醒、每 3 分钟投递任务，过期任务和成功执行过的时间槽跳过。无公开手动扫描或配置接口。
 - `stock-monitor/core.mjs`：移植的 39 对股票折价引擎；`market-clock.mjs` 保留行情时效和市场日历判断。
 - `stock-monitor/storage.mjs`：行情、乘数与确认/冷却状态，使用 D1 避免每轮 KV 写入；`/health` 提供不含凭据的受控执行状态。
 - OKX 三项行情凭据使用新 Worker 的加密 Secrets。由于沿用同一个 OKX API Key，`HISTORY_DB` 绑定只用于既有 `api_request_slots` 的共享账户请求限速；股票状态已经独立，不读取钱包数据。将来若给股票监控独立的 OKX Key，可同时解除共享限速存储依赖。
@@ -147,3 +147,5 @@ https://docs.dexscreener.com/api/reference
 旧 Onchain Desk 股票调度和旧频道推送已停用，独立股票状态从最终冻结快照迁移，保留 39 个乘数及 24 个交易对的确认/冷却记录。新配置开启 `SCAN_ENABLED=true`，网站改为读取独立 `/snapshot`；旧 `/api/public/xstocks` 继续代理新快照。初次新资源引导使用本机 Wrangler；后续自动部署在本仓库执行。
 
 后台部署专用 Token 已配置在本仓库 `CLOUDFLARE_WORKERS_API_TOKEN` 加密 Secret，网站继续使用原 `CLOUDFLARE_API_TOKEN`。2026-10-06 后台自动部署已完成成功验证：https://github.com/yiqiangchen2026/yc-crypto/actions/runs/37446299315 。
+
+新 Worker 的 Cron 在初次注册后未自然触发，已采用与旧后台一致的每分钟唤醒、每 3 分钟投递方式，并记录 `lastCronAt`。Onchain Desk 仅在新 Cron 超过 6 分钟未投递时，向同一股票 Queue 做容错投递，不执行股票扫描或发送股票通知。新 Cron 正常后容错自动停止；两路投递仍受单并发与成功时间槽去重保护。此依赖与已有共享 OKX 限速一起保留，股票执行代码和状态独立。

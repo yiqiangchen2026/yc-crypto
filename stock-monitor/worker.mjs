@@ -24,7 +24,11 @@ export async function processScan(env, requestedAt, now = Date.now(), run = runX
 }
 export default {
   async scheduled(controller, env, ctx) {
-    if (env.SCAN_ENABLED === 'true') ctx.waitUntil(env.SCAN_QUEUE.send({ kind:'stock-scan',requestedAt:controller.scheduledTime }));
+    if (env.SCAN_ENABLED !== 'true' || new Date(controller.scheduledTime).getUTCMinutes() % 3 !== 0) return;
+    ctx.waitUntil((async () => {
+      await env.SCAN_QUEUE.send({ kind:'stock-scan',requestedAt:controller.scheduledTime });
+      await stateStore(env.STOCK_DB).put('stock-cron-v1',JSON.stringify({at:Date.now()}));
+    })());
   },
   async queue(batch, env) {
     // A dedicated max_concurrency=1 Queue serializes state transitions and notifications.
@@ -44,8 +48,9 @@ export default {
     try {
       if (path === '/health') {
         const row = await env.STOCK_DB.prepare('SELECT * FROM scan_runs WHERE id=1').first();
+        const cron = await stateStore(env.STOCK_DB).get('stock-cron-v1','json');
         return Response.json({ enabled:env.SCAN_ENABLED === 'true',notificationsEnabled:env.XSTOCK_PUBLIC_ALERTS_ENABLED === 'true',
-          lastAttemptAt:row?.last_attempt_at||null,lastSuccessAt:row?.last_success_at||null,
+          lastCronAt:cron?.at||null,lastAttemptAt:row?.last_attempt_at||null,lastSuccessAt:row?.last_success_at||null,
           lastErrorAt:row?.last_error_at||null,error:row?.last_error||null,runCount:row?.run_count||0 },{headers:{...headers,'Cache-Control':'no-store'}});
       }
       const state = await stateStore(env.STOCK_DB).get(STATE_KEY,'json');

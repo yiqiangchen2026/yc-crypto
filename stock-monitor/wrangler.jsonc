@@ -6,7 +6,7 @@
   "workers_dev": true,
   "observability": { "enabled": true },
   "services": [{ "binding": "NOTIFIER", "service": "yc-volume-monitor", "entrypoint": "StockNotifier" }],
-  "triggers": { "crons": ["*/3 * * * *"] },
+  "triggers": { "crons": ["* * * * *"] },
   "queues": {
     "producers": [{ "binding": "SCAN_QUEUE", "queue": "yc-stock-scan" }],
     "consumers": [{ "queue": "yc-stock-scan", "max_batch_size": 1, "max_batch_timeout": 1, "max_retries": 0, "max_concurrency": 1 }]
