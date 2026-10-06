@@ -4,23 +4,60 @@
   "compatibility_date": "2026-10-06",
   "account_id": "1e48e927816f1c260c9085542a4f658f",
   "workers_dev": true,
-  "observability": { "enabled": true },
-  "services": [{ "binding": "NOTIFIER", "service": "yc-volume-monitor", "entrypoint": "StockNotifier" }],
-  "triggers": { "crons": ["* * * * *"] },
+  "observability": {
+    "enabled": true
+  },
+  "services": [
+    {
+      "binding": "NOTIFIER",
+      "service": "yc-volume-monitor",
+      "entrypoint": "StockNotifier"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  },
   "queues": {
-    "producers": [{ "binding": "SCAN_QUEUE", "queue": "yc-stock-scan" }],
-    "consumers": [{ "queue": "yc-stock-scan", "max_batch_size": 1, "max_batch_timeout": 1, "max_retries": 0, "max_concurrency": 1 }]
+    "producers": [
+      {
+        "binding": "SCAN_QUEUE",
+        "queue": "yc-stock-scan"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "yc-stock-scan",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1,
+        "max_retries": 0,
+        "max_concurrency": 1
+      }
+    ]
   },
   "d1_databases": [
-    { "binding": "STOCK_DB", "database_name": "yc-stock-monitor", "database_id": "4b5c16ca-d5f3-494f-a6fd-bf74cc6d8fc9", "migrations_dir": "migrations" },
-    { "binding": "HISTORY_DB", "database_name": "xlayer-wallet-history", "database_id": "b5d335c1-d4d5-4531-9e58-5eb8b029d9fb" }
+    {
+      "binding": "STOCK_DB",
+      "database_name": "yc-stock-monitor",
+      "database_id": "4b5c16ca-d5f3-494f-a6fd-bf74cc6d8fc9",
+      "migrations_dir": "migrations"
+    }
   ],
   "vars": {
-    "SITE_ORIGIN": "https://yc-crypto.pages.dev", "STATE_STORAGE": "d1",
-    "USDG_SCAN_ENABLED": "true", "USDG_QUOTE_USDC": "5000", "USDG_ALERT_EDGE": "0.0001",
-    "SCAN_ENABLED": "true", "XSTOCK_PUBLIC_ALERTS_ENABLED": "true",
-    "XSTOCK_QUOTE_USD": "500", "XSTOCK_ROUGH_DISCOUNT": "0.01", "XSTOCK_ALERT_DISCOUNT": "0.02",
-    "XSTOCK_ALERT_RESET_DISCOUNT": "0.018", "XSTOCK_CONFIRMATIONS": "2",
-    "XSTOCK_CONFIRMATION_SECONDS": "180", "XSTOCK_ALERT_COOLDOWN_MINUTES": "90"
+    "SITE_ORIGIN": "https://yc-crypto.pages.dev",
+    "STATE_STORAGE": "d1",
+    "USDG_SCAN_ENABLED": "true",
+    "USDG_QUOTE_USDC": "5000",
+    "USDG_ALERT_EDGE": "0.0001",
+    "SCAN_ENABLED": "true",
+    "XSTOCK_PUBLIC_ALERTS_ENABLED": "true",
+    "XSTOCK_QUOTE_USD": "500",
+    "XSTOCK_ROUGH_DISCOUNT": "0.01",
+    "XSTOCK_ALERT_DISCOUNT": "0.02",
+    "XSTOCK_ALERT_RESET_DISCOUNT": "0.018",
+    "XSTOCK_CONFIRMATIONS": "2",
+    "XSTOCK_CONFIRMATION_SECONDS": "180",
+    "XSTOCK_ALERT_COOLDOWN_MINUTES": "90"
   }
 }

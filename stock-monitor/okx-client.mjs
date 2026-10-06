@@ -1,4 +1,5 @@
 const OKX_API = "https://web3.okx.com";
+// Stock and USDG scans share a single-concurrency queue and a dedicated public OKX key.
 const OKX_MIN_INTERVAL_MS = 1250;
 const OKX_MAX_ATTEMPTS = 5;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -38,13 +39,6 @@ export function createOkxClient(env) {
     for (let attempt = 1; attempt <= OKX_MAX_ATTEMPTS; attempt += 1) {
       const waitForSlot = OKX_MIN_INTERVAL_MS - (Date.now() - lastRequestAt);
       if (waitForSlot > 0) await sleep(waitForSlot);
-      if (env.STATE_STORAGE === 'd1' && env.HISTORY_DB) {
-        const slot = await env.HISTORY_DB.prepare(`INSERT INTO api_request_slots(key,next_at) VALUES('okx',?)
-          ON CONFLICT(key) DO UPDATE SET next_at=MAX(api_request_slots.next_at+1250,excluded.next_at)
-          RETURNING next_at`).bind(Date.now()).first();
-        const delay = slot.next_at - Date.now();
-        if (delay > 0) await sleep(delay);
-      }
       const timestamp = new Date().toISOString();
       const key = await crypto.subtle.importKey(
         "raw", new TextEncoder().encode(env.OKX_SECRET_KEY),

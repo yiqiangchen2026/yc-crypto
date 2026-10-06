@@ -137,7 +137,7 @@ https://docs.dexscreener.com/api/reference
 - `yc-stock-monitor`：独立 D1 数据库 `yc-stock-monitor`，专用单并发 `yc-stock-scan` Queue，每分钟 Cron 唤醒、每 3 分钟投递任务，过期任务和成功执行过的时间槽跳过。无公开手动扫描或配置接口。
 - `stock-monitor/core.mjs`：移植的 39 对股票折价引擎；`market-clock.mjs` 保留行情时效和市场日历判断。
 - `stock-monitor/storage.mjs`：行情、乘数与确认/冷却状态，使用 D1 避免每轮 KV 写入；`/health` 提供不含凭据的受控执行状态。
-- OKX 三项行情凭据使用新 Worker 的加密 Secrets。由于沿用同一个 OKX API Key，`HISTORY_DB` 绑定只用于既有 `api_request_slots` 的共享账户请求限速；股票状态已经独立，不读取钱包数据。将来若给股票监控独立的 OKX Key，可同时解除共享限速存储依赖。
+- OKX 三项行情凭据使用 Worker 加密 Secrets。2026-10-07 公共监控切换至 `yc-public-monitor`，私人监控使用 `yc-private-monitor`。公共 Worker 已移除个人 `xlayer-wallet-history` 的 `HISTORY_DB` 绑定与共享限速表访问；股票/USDG 仍由专用单并发队列串行执行，请求间隔保持至少 1.25 秒。
 - 迁移数据只复制 `xstock-discount-monitor-v1`，包含乘数、连续确认、冷却及待汇总状态；不提交状态备份或密钥到 GitHub。先暂停旧调度并等待旧任务排空，再复制最终状态并启用新调度。回滚时先暂停新后台，再将其最新状态迁回旧后台；不可直接启用旧冻结状态，否则可能重复提醒。
 
 新后台首次资源配置使用 Wrangler 引导；后续代码发布走 GitHub。Secrets 在 Cloudflare 保留，自动部署不会把它们上传到 GitHub。`SCAN_ENABLED` 是生产调度开关；迁移准备版本设为 false，完成切换后设为 true。
