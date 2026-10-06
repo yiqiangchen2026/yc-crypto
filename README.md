@@ -148,4 +148,4 @@ https://docs.dexscreener.com/api/reference
 
 后台部署专用 Token 已配置在本仓库 `CLOUDFLARE_WORKERS_API_TOKEN` 加密 Secret，网站继续使用原 `CLOUDFLARE_API_TOKEN`。2026-10-06 后台自动部署已完成成功验证：https://github.com/yiqiangchen2026/yc-crypto/actions/runs/37446299315 。
 
-新 Worker 的 Cron 在初次注册后未自然触发，已采用与旧后台一致的每分钟唤醒、每 3 分钟投递方式，并记录 `lastCronAt`。Onchain Desk 仅在新 Cron 超过 6 分钟未投递时，向同一股票 Queue 做容错投递，不执行股票扫描或发送股票通知。新 Cron 正常后容错自动停止；两路投递仍受单并发与成功时间槽去重保护。此依赖与已有共享 OKX 限速一起保留，股票执行代码和状态独立。
+2026-10-06 重新核对时，新 Worker 已自然写入 `lastCronAt` 并完成扫描，说明此前的短期观测未能证明持续故障。Onchain Desk 的临时容错生产者绑定和调度代码已移除，股票定时投递不再依赖旧 Worker。每分钟唤醒、每 3 分钟投递的生产频率保持不变。新 Cron 从何时开始生效及先前延迟的具体平台原因未由现有记录确认，不能把推测写成根因。
