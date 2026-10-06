@@ -113,3 +113,12 @@ https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-t
 https://developers.cloudflare.com/workers/platform/limits/
 https://developers.cloudflare.com/kv/platform/limits/
 https://docs.dexscreener.com/api/reference
+
+## 市场时钟
+
+`/market-clock/` 从 Onchain Desk 独立拆出本地时间与美国、香港、加密货币三张时钟卡片，保留实时钟、时段提示、24 小时时间轴和下次盘前倒计时，不包含交易对分组清单。浏览器每秒更新，无后端服务或行情请求。
+
+- `site/market-clock/market-clock.js`：独立时段引擎，不依赖原项目的持仓、监控或 Telegram。
+- `site/market-clock/clock.js` / `clock.css`：时钟卡片，复用全站深浅色主题。
+
+沿用原时段、夏令时、节假日和半日市逻辑。港股节假日覆盖 2026–2027 年，港股半日市覆盖 2026 年；跨年需维护日历，临时停市不自动识别。原项目的页面暂保留。
