@@ -1,4 +1,4 @@
-name: Check volume monitor
+name: Check monitors
 on:
   push:
     paths: ['monitor/**', 'stock-monitor/**', '.github/workflows/check-monitor.yml']

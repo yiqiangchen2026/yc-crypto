@@ -39,7 +39,7 @@ GitHub Actions 工作流 `.github/workflows/deploy.yml` 会在 `main` 的网站�
 
 首次启用需要在仓库 Settings → Secrets and variables → Actions 配置仓库 Secret：
 
-- `CLOUDFLARE_API_TOKEN`：Cloudflare Pages 发布凭据；账号范围限定为托管该网站的账号。后台工作流优先使用 `CLOUDFLARE_WORKERS_API_TOKEN`，未配置时复用此 Token。后台凭据需要同一账号的 Workers Scripts Edit、D1 Edit、Queues Edit，以及 Account Settings Read 等 Wrangler 所需权限；不需要 OKX 或 TG 密钥。
+- `CLOUDFLARE_API_TOKEN`：Cloudflare Pages 发布凭据；账号范围限定为托管该网站的账号。后台工作流优先使用 `CLOUDFLARE_WORKERS_API_TOKEN`，未配置时复用此 Token。后台凭据使用同一账号的 Workers Scripts Edit、D1 Edit、Queues Edit、Workers KV Storage Read 和 Account Settings Read；不需要 OKX 或 TG 密钥。
 
 账号 ID 是公开部署标识，已写在工作流中。Token 必须保存在 Secret 中，不能提交到仓库。未配置 Token 时工作流会明确失败，不会发布。
 
@@ -145,3 +145,5 @@ https://docs.dexscreener.com/api/reference
 ### 2026-10-06 切换记录
 
 旧 Onchain Desk 股票调度和旧频道推送已停用，独立股票状态从最终冻结快照迁移，保留 39 个乘数及 24 个交易对的确认/冷却记录。新配置开启 `SCAN_ENABLED=true`，网站改为读取独立 `/snapshot`；旧 `/api/public/xstocks` 继续代理新快照。初次新资源引导使用本机 Wrangler；后续自动部署在本仓库执行。
+
+后台部署专用 Token 已配置在本仓库 `CLOUDFLARE_WORKERS_API_TOKEN` 加密 Secret，网站继续使用原 `CLOUDFLARE_API_TOKEN`。2026-10-06 后台自动部署已完成成功验证：https://github.com/yiqiangchen2026/yc-crypto/actions/runs/37446299315 。
