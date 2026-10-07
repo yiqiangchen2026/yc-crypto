@@ -1,4 +1,24 @@
 export const STATE_KEY = 'xstock-discount-monitor-v1';
+export function monitorStore(env) {
+  if (env.STATE_STORAGE !== 'durable-object') return stateStore(env.STOCK_DB);
+  const stub = env.MONITOR_STATE.get(env.MONITOR_STATE.idFromName('public-monitors-v1'));
+  return {
+    async get(key, type = 'text') {
+      const value = await stub.get(key);
+      return value == null ? null : type === 'json' ? JSON.parse(value) : value;
+    },
+    async put(key, value) { await stub.put(key, value); }
+  };
+}
+export async function scanRun(env) {
+  if (env.STATE_STORAGE === 'durable-object') return await monitorStore(env).get('stock-scan-run-v1','json');
+  return await env.STOCK_DB.prepare('SELECT * FROM scan_runs WHERE id=1').first();
+}
+export async function recordMonitorScan(env, now, success, slot) {
+  if (env.STATE_STORAGE !== 'durable-object') return recordScan(env.STOCK_DB, now, success, slot);
+  const stub = env.MONITOR_STATE.get(env.MONITOR_STATE.idFromName('public-monitors-v1'));
+  return await stub.recordScan(now, success, slot);
+}
 export function stateStore(db) {
   return {
     async get(key, type = 'text') {

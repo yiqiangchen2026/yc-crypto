@@ -131,12 +131,12 @@ https://docs.dexscreener.com/api/reference
 
 ## 两个监控后台自动部署
 
-推送 `main` 的 `monitor/**`、`stock-monitor/**`、包配置或部署工作流修改，会触发 `Deploy monitor Workers`。流程先测试两个监控，再发布交易量 Worker 的内部股票通知入口、应用股票 D1 schema、发布股票 Worker，最后验证两个公开快照。网站继续由 `Deploy to Cloudflare Pages` 发布；无需每轮行情重发网站。
+推送 `main` 的 `monitor/**`、`stock-monitor/**`、包配置或部署工作流修改，会触发 `Deploy monitor Workers`。流程先测试两个监控，再发布交易量 Worker 的内部股票通知入口、发布股票 Worker，最后验证两个公开快照。网站继续由 `Deploy to Cloudflare Pages` 发布；无需每轮行情重发网站。
 
 - `yc-volume-monitor`：现有 KV 与采集流程保持不变；`StockNotifier` 是仅服务绑定可调用的通知入口，固定向现有「YC 链上信号」频道发送，无公开通知 HTTP 接口。TG Secret 仍只在此 Worker。
-- `yc-stock-monitor`：独立 D1 数据库 `yc-stock-monitor`，专用单并发 `yc-stock-scan` Queue，每分钟 Cron 唤醒、每 3 分钟投递任务，过期任务和成功执行过的时间槽跳过。无公开手动扫描或配置接口。
+- `yc-stock-monitor`：SQLite 型 Durable Object `MonitorState` 保存股票/USDG 状态，专用单并发 `yc-stock-scan` Queue，每分钟 Cron 唤醒、每 3 分钟投递任务，过期任务和成功执行过的时间槽跳过。无公开手动扫描或配置接口。
 - `stock-monitor/core.mjs`：移植的 39 对股票折价引擎；`market-clock.mjs` 保留行情时效和市场日历判断。
-- `stock-monitor/storage.mjs`：行情、乘数与确认/冷却状态，使用 D1 避免每轮 KV 写入；`/health` 提供不含凭据的受控执行状态。
+- `stock-monitor/storage.mjs`：行情、乘数与确认/冷却状态，使用 Durable Object 避免 D1 账户额度故障及 KV 每日写入限制；`/health` 提供不含凭据的受控执行状态。
 - OKX 三项行情凭据使用 Worker 加密 Secrets。2026-10-07 公共监控切换至 `yc-public-monitor`，私人监控使用 `yc-private-monitor`。公共 Worker 已移除个人 `xlayer-wallet-history` 的 `HISTORY_DB` 绑定与共享限速表访问；股票/USDG 仍由专用单并发队列串行执行，请求间隔保持至少 1.25 秒。
 - 迁移数据只复制 `xstock-discount-monitor-v1`，包含乘数、连续确认、冷却及待汇总状态；不提交状态备份或密钥到 GitHub。先暂停旧调度并等待旧任务排空，再复制最终状态并启用新调度。回滚时先暂停新后台，再将其最新状态迁回旧后台；不可直接启用旧冻结状态，否则可能重复提醒。
 
@@ -150,9 +150,15 @@ https://docs.dexscreener.com/api/reference
 
 2026-10-06 重新核对时，新 Worker 已自然写入 `lastCronAt` 并完成扫描，说明此前的短期观测未能证明持续故障。Onchain Desk 的临时容错生产者绑定和调度代码已移除，股票定时投递不再依赖旧 Worker。每分钟唤醒、每 3 分钟投递的生产频率保持不变。新 Cron 从何时开始生效及先前延迟的具体平台原因未由现有记录确认，不能把推测写成根因。
 
+### 2026-10-07 D1 配额故障恢复
+
+账户 D1 每日读取额度耗尽导致股票/USDG 状态查询失败。暂停两个旧扫描后，冻结并迁移 6 个状态键及股票执行记录至免费 SQLite 型 Durable Object `MonitorState`，固定对象名 `public-monitors-v1`。保留 39 个乘数和 25 个交易对的信号状态，以及 USDG 的确认/冷却状态。一次性引导版本通过内部构造器初始化，验证成功后发布不含迁移数据的正式版本并重新开启调度。没有公开迁移/写入接口。
+
+生产 `STATE_STORAGE=durable-object`，不绑定 D1；旧 D1 保留作为冻结备份，旧快照不得直接回滚启用。`durable-storage.mjs` 保存状态与执行记录；`durable-object.mjs` 为内部 RPC 包装，只有短暂存储调用，不持有定时器或外部请求。新对象未完成迁移时拒绝读写，避免在空状态下重复提醒。后续部署须保留对象名、类名和 `monitor-state-v1` SQLite migration；不能重建命名空间。31 项监控测试通过，包括完全禁止 D1 访问的股票/USDG 测试。Durable Objects 仍受免费额度约束，并非无限额度。
+
 ## USDG-USDC 候选价差（2026-10-07 迁移）
 
-`/monitor/usdg/` 为第三个监控模块，页面每分钟读取 `yc-stock-monitor` 的 `/usdg/snapshot`，9 分钟未更新标记过期。USDG 模块在 `usdg-monitor/` 独立维护，复用撸毛站股票后台的 OKX 加密凭据、D1、单并发 Queue 和频道通知服务，不再由 Onchain Desk 自动扫描或推送。股票在 UTC 分钟 `minute % 3 === 0` 扫描；USDG 在 `minute % 3 === 1` 扫描。两者各每 3 分钟，排队可能延迟；USDG 使用独立状态和健康记录，不覆盖股票状态。
+`/monitor/usdg/` 为第三个监控模块，页面每分钟读取 `yc-stock-monitor` 的 `/usdg/snapshot`，9 分钟未更新标记过期。USDG 模块在 `usdg-monitor/` 独立维护，复用撸毛站股票后台的 OKX 加密凭据、Durable Object、单并发 Queue 和频道通知服务，不再由 Onchain Desk 自动扫描或推送。股票在 UTC 分钟 `minute % 3 === 0` 扫描；USDG 在 `minute % 3 === 1` 扫描。两者各每 3 分钟，排队可能延迟；USDG 使用独立状态和健康记录，不覆盖股票状态。
 
 保留原逻辑：5,000 USDC → USDG、0.01% 毛差门槛、两轮候选确认、PendleSwap 0.01% 滑点预览复核且最低到账超过本金、10 分钟冷却和回落重新武装。毛差按 1:1 计算，不代表净利润。候选初筛与 Pendle 复核报价在页面明确区分；未复核不显示最低到账。
 

@@ -1,5 +1,5 @@
 import { runUsdgMonitor } from './core.mjs';
-import { stateStore } from '../stock-monitor/storage.mjs';
+import { monitorStore } from '../stock-monitor/storage.mjs';
 import { createOkxClient } from '../stock-monitor/okx-client.mjs';
 
 export const SNAPSHOT_KEY = 'usdg-public-snapshot-v1';
@@ -11,7 +11,7 @@ export function publicQuote(quote) {
 export async function processUsdgScan(env, requestedAt, now = Date.now(), run = runUsdgMonitor) {
   if (env.USDG_SCAN_ENABLED !== 'true') return { skipped:'disabled' };
   if (!Number.isFinite(requestedAt) || requestedAt > now+60000 || now-requestedAt > 360000) return { skipped:'expired' };
-  const store = stateStore(env.STOCK_DB);
+  const store = monitorStore(env);
   const previous = await store.get(RUN_KEY,'json') || {};
   const slot = Math.floor(requestedAt/180000);
   if (previous.lastSlot >= slot) return { skipped:'duplicate' };
@@ -33,7 +33,7 @@ export async function processUsdgScan(env, requestedAt, now = Date.now(), run = 
   }
 }
 export async function usdgResponse(path, env, headers) {
-  const store = stateStore(env.STOCK_DB);
+  const store = monitorStore(env);
   const health = await store.get(RUN_KEY,'json') || {};
   if (path === '/usdg/health') {
     const cron = await store.get('usdg-cron-v1','json');

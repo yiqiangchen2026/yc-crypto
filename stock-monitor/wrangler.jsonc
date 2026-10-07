@@ -1,9 +1,13 @@
 {
   "name": "yc-stock-monitor",
-  "main": "worker.mjs",
+  "main": "entry.mjs",
   "compatibility_date": "2026-10-06",
   "account_id": "1e48e927816f1c260c9085542a4f658f",
   "workers_dev": true,
+  "durable_objects": {
+    "bindings": [{ "name": "MONITOR_STATE", "class_name": "MonitorState" }]
+  },
+  "migrations": [{ "tag": "monitor-state-v1", "new_sqlite_classes": ["MonitorState"] }],
   "observability": {
     "enabled": true
   },
@@ -36,17 +40,9 @@
       }
     ]
   },
-  "d1_databases": [
-    {
-      "binding": "STOCK_DB",
-      "database_name": "yc-stock-monitor",
-      "database_id": "4b5c16ca-d5f3-494f-a6fd-bf74cc6d8fc9",
-      "migrations_dir": "migrations"
-    }
-  ],
   "vars": {
     "SITE_ORIGIN": "https://yc-crypto.pages.dev",
-    "STATE_STORAGE": "d1",
+    "STATE_STORAGE": "durable-object",
     "USDG_SCAN_ENABLED": "true",
     "USDG_QUOTE_USDC": "5000",
     "USDG_ALERT_EDGE": "0.0001",
