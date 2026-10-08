@@ -1,3 +1,4 @@
+import { readPools } from './xlayer-pools.mjs';
 import { RULES } from '../monitor/config.mjs';
 import { transition, money } from '../monitor/core.mjs';
 import { monitorStore } from './storage.mjs';
@@ -23,13 +24,15 @@ export async function scanVolume(env,okx,now=Date.now()) {
   if(now-Date.parse(old.scannedAt)<5*60000)return {skipped:'duplicate'};
   let data=[];try{data=await okx('/api/v6/dex/market/price-info',{payload:TOKENS.map(t=>({chainIndex:'196',tokenContractAddress:t.address}))});if(!Array.isArray(data))throw Error('invalid');}catch{data=[];}
   const signals={...old.signals},alerts=[],events=[...(old.events||[])];
+  const poolData=new Map();
+  for(const token of TOKENS) poolData.set(token.symbol,await readPools(token,old.rows.find(r=>r.address===token.address),okx,now));
   const rows=TOKENS.map(token=>{
     const prev=old.rows.find(r=>r.address===token.address);
     try{
       const row=normalize(token,data.find(d=>d.tokenContractAddress?.toLowerCase()===token.address),now),step=transition(row,signals[token.symbol],now);
       signals[token.symbol]=step.state;if(step.notify)alerts.push(row);
-      return {...row,history:[...(prev?.history||[]),{at:row.updatedAt,v:row.volume.m5}].slice(-72)};
-    }catch{return {...(prev||token),status:'error',stale:true,errorCode:'invalid-or-unavailable'};}
+      return {...row,...poolData.get(token.symbol),history:[...(prev?.history||[]),{at:row.updatedAt,v:row.volume.m5}].slice(-72)};
+    }catch{return {...(prev||token),...poolData.get(token.symbol),status:'error',stale:true,errorCode:'invalid-or-unavailable'};}
   });
   let notification=old.notification||'not-configured',enabled=false;
   try{enabled=(await channelSettings(env)).xlayerVolume;}catch{notification='settings-unavailable';}

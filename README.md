@@ -70,7 +70,7 @@ npm run deploy
 
 ## 交易量监控 / Telegram
 
-`/monitor/` 是监控入口，下设 `/monitor/stocks/` 股票价差和 `/monitor/volume/` 交易量监控，原 `/volume/` 页面保留兼容。两个页面复用全站主题及 `site/monitor/monitor.css`。页面读取 Cloudflare Worker 的缓存，不直接请求行情或暴露 Bot Token；后台接收新快照后计算提醒去重、写入KV并向频道发送信号。
+`/monitor/` 是监控入口，下设 `/monitor/stocks/` 股票价差和 `/monitor/robinhood-volume/` 交易量监控，原 `/volume/` 页面保留兼容。两个页面复用全站主题及 `site/monitor/monitor.css`。页面读取 Cloudflare Worker 的缓存，不直接请求行情或暴露 Bot Token；后台接收新快照后计算提醒去重、写入KV并向频道发送信号。
 
 采集计划由公开仓库的 `.github/workflows/collect-volume.yml` 执行，标准GitHub-hosted Ubuntu runner免费，每5分钟计划一次，避开整点。GitHub调度为best effort，忙时可能延迟或漏跑，公开仓库60天无活动还可能自动停用schedule；因此页面显示采集时间，12分钟未更新则标记过期。若改成私有仓库，需要重新评估Actions分钟额度。本流程不上传artifact、不缓存行情文件，也不因每轮采集重新部署Pages。
 
@@ -171,3 +171,5 @@ https://docs.dexscreener.com/api/reference
 2026-10-08：修正 RH 采集写入旧 workers.dev 域名导致的 DNS 失败，移除 RH 监控中的 Trust Wallet 活动描述。新增 `/monitor/xlayer-volume/`，精确匹配 OKX Q3 Earnings 页面四个合约，使用现有 OKX API 凭据，每五分钟批量查询一次 price-info，在既有 Durable Object 串行扫描器内运行。独立保存历史、冷却和成功提醒；共用交易量通知开关。OKX 数据为代币汇总，未筛选比赛配对及路由；4h 窗口用于前3h小时放量基准，其他门槛沿用 RH。接口 `/xlayer-volume/snapshot` 不暴露内部冷却状态。
 
 2026-10-08 通知拆分：RH 沿用 volume 设置键，X Layer 使用独立 xlayerVolume 键。首次读取会保存旧开关状态作为 X Layer 初始值，之后各自独立；历史 volume 按钮仅影响 RH。监控入口更新为四张卡片，RH 页面及通知标题补齐链名称。
+
+2026-10-08 URL与池信息：RH 规范地址改为 `/monitor/robinhood-volume/`，旧 `/monitor/volume/` 和 `/volume/` 通过 Pages 301 跳转。X Layer 每15分钟串行读取 OKX top-liquidity 前5池，显示实际配对、池地址、LP费率、实时池流动性和数据时间。池接口失败保留旧数据或官方页面核验的静态池地址，静态条目不填充实时流动性；池失败不影响代币成交量告警。官方页面及官方 RPC 核验主池：JNJx/MSx 配 wSPYx，ASMLx/TSMx 配 wQQQx，V3 费率0.05%；包装资产 asset() 对应活动指定合约。代币成交量仍为 OKX 汇总，不能归因到任意单池。
