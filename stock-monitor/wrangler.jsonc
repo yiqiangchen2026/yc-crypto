@@ -47,6 +47,7 @@
     ]
   },
   "vars": {
+    "XLAYER_VOLUME_ENABLED": "true",
     "SITE_ORIGIN": "https://yc-crypto.pages.dev",
     "STATE_STORAGE": "durable-object",
     "USDG_SCAN_ENABLED": "true",

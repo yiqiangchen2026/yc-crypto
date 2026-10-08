@@ -1,3 +1,4 @@
+import { scanVolume, VOLUME_KEY, publicVolume } from './xlayer-volume.mjs';
 import { runXStockMonitor } from './core.mjs';
 import { createOkxClient } from './okx-client.mjs';
 import { STATE_KEY, monitorStore, publicSnapshot, scanRun, recordMonitorScan } from './storage.mjs';
@@ -26,6 +27,10 @@ export async function processScan(env, requestedAt, now = Date.now(), run = runX
 }
 export async function processQueuedScan(env, job) {
   try {
+    if (job?.kind === 'xlayer-volume') {
+      if (env.XLAYER_VOLUME_ENABLED !== 'true' || !Number.isFinite(job.requestedAt) || Math.abs(Date.now()-job.requestedAt)>6*60000) return {skipped:'disabled-or-expired'};
+      return await scanVolume(env,createOkxClient(env));
+    }
     if (job?.kind === 'stock-scan') return await processScan(env, job.requestedAt);
     if (job?.kind === 'usdg-scan') return await processUsdgScan(env, job.requestedAt);
     return { skipped: 'unknown-job' };
@@ -43,6 +48,7 @@ async function dispatchScan(env, job) {
 }
 export default {
   async scheduled(controller, env, ctx) {
+    if (env.XLAYER_VOLUME_ENABLED === 'true' && new Date(controller.scheduledTime).getUTCMinutes() % 5 === 2) ctx.waitUntil(dispatchScan(env,{kind:'xlayer-volume',requestedAt:controller.scheduledTime}));
     if (env.USDG_SCAN_ENABLED === 'true' && new Date(controller.scheduledTime).getUTCMinutes() % 3 === 1) {
       ctx.waitUntil((async () => {
         await dispatchScan(env, { kind:'usdg-scan',requestedAt:controller.scheduledTime });
@@ -69,8 +75,12 @@ export default {
     const path = new URL(request.url).pathname;
     const headers = { 'Cache-Control':'public, max-age=60','Access-Control-Allow-Origin':env.SITE_ORIGIN,
       'X-Content-Type-Options':'nosniff' };
-    if (request.method !== 'GET' || !['/snapshot','/health','/usdg/snapshot','/usdg/health'].includes(path)) return new Response('Not found',{status:404});
+    if (request.method !== 'GET' || !['/snapshot','/health','/usdg/snapshot','/usdg/health','/xlayer-volume/snapshot'].includes(path)) return new Response('Not found',{status:404});
     try {
+      if (path === '/xlayer-volume/snapshot') {
+        const snapshot=publicVolume(await monitorStore(env).get(VOLUME_KEY,'json'));
+        return Response.json(snapshot||{error:'warming-up'},{status:snapshot?200:503,headers});
+      }
       if (path.startsWith('/usdg/')) return await usdgResponse(path,env,headers);
       if (path === '/health') {
         const row = await scanRun(env);

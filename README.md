@@ -74,7 +74,7 @@ npm run deploy
 
 采集计划由公开仓库的 `.github/workflows/collect-volume.yml` 执行，标准GitHub-hosted Ubuntu runner免费，每5分钟计划一次，避开整点。GitHub调度为best effort，忙时可能延迟或漏跑，公开仓库60天无活动还可能自动停用schedule；因此页面显示采集时间，12分钟未更新则标记过期。若改成私有仓库，需要重新评估Actions分钟额度。本流程不上传artifact、不缓存行情文件，也不因每轮采集重新部署Pages。
 
-`node scripts/collect-volume.mjs` 通过 DEX Screener公共API请求活动全部16个股票代币，精确匹配活动合约与USDG合约，合并去重后的池子。每轮16请求、两个并发，使用原生5m、1h、6h、24h窗口，不估算15m成交额。原Cloudflare定时采集因共享出口限流不再启用；私有collector仅保留用于管理员手动诊断。
+`node scripts/collect-volume.mjs` 通过 DEX Screener公共API请求RH 白名单全部16个股票代币，精确匹配股票合约与USDG合约，合并去重后的池子。每轮16请求、两个并发，使用原生5m、1h、6h、24h窗口，不估算15m成交额。原Cloudflare定时采集因共享出口限流不再启用；私有collector仅保留用于管理员手动诊断。
 
 - `monitor/config.mjs`：白名单、USDG合约、阈值。
 - `monitor/core.mjs`：行情解析、放量检测、提醒去重。
@@ -167,3 +167,5 @@ https://docs.dexscreener.com/api/reference
 切换：先部署新模块且保持关闭；旧 Onchain Desk 新增 `USDG_SCAN_ENABLED=false`，同时拦截旧排队扫描；等待旧 USDG 状态稳定，再复制 `usdg-usdc-quote-alert-v2` 和最后成功报价至新 D1，之后启用新调度。本次最终旧状态 `active=false`，没有待确认或冷却时间戳；按原值迁移，未人为添加或重置。旧监控中心改为读取新后台 `/usdg/health` 和 `/usdg/snapshot` 并链接新页面。Onchain Desk 的手动 `/usdg` 查询保留；本机 2 秒高速监控已于 2026-10-07 按要求移除并重新部署本地服务。回滚前先停新调度，等任务排空，将新状态迁回旧库后才开启旧调度，避免重复提醒。
 
 `npm run test:monitor` 包含 USDG 规则、迁移、调度、去重、异常保留旧报价及通知边界测试。USDG 修改已纳入 GitHub 后台自动测试、部署工作流，前端继续使用原 Cloudflare Pages 自动部署。
+
+2026-10-08：修正 RH 采集写入旧 workers.dev 域名导致的 DNS 失败，移除 RH 监控中的 Trust Wallet 活动描述。新增 `/monitor/xlayer-volume/`，精确匹配 OKX Q3 Earnings 页面四个合约，使用现有 OKX API 凭据，每五分钟批量查询一次 price-info，在既有 Durable Object 串行扫描器内运行。独立保存历史、冷却和成功提醒；共用交易量通知开关。OKX 数据为代币汇总，未筛选比赛配对及路由；4h 窗口用于前3h小时放量基准，其他门槛沿用 RH。接口 `/xlayer-volume/snapshot` 不暴露内部冷却状态。

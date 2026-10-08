@@ -23,3 +23,8 @@ async function deliverSignal(env,text,options,fetcher) {
   if (!response.ok || !result.ok) throw new Error('Stock signal delivery failed');
   return { delivered: true };
 }
+
+export async function sendVolumeSignal(env,text,fetcher=fetch) {
+  if(typeof text!=='string'||text.length>3900||!text.startsWith('📈 YC 链上信号｜X Layer 美股交易量放量\n')||!text.endsWith('https://yc-crypto.pages.dev/monitor/xlayer-volume/')) throw Error('Invalid volume signal');
+  return deliverSignal(env,text,{},fetcher);
+}

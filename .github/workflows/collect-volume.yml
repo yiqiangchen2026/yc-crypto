@@ -20,5 +20,5 @@ jobs:
       - name: Collect and publish snapshot
         run: node scripts/collect-volume.mjs
         env:
-          MONITOR_INGEST_URL: https://yc-volume-monitor.xlayer-wallet-report-worker.workers.dev/admin/ingest
+          MONITOR_INGEST_URL: https://yc-volume-monitor.yc2026.workers.dev/admin/ingest
           VOLUME_INGEST_TOKEN: ${{ secrets.VOLUME_INGEST_TOKEN }}
