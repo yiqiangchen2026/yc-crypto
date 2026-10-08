@@ -23,27 +23,43 @@ export async function processScan(env, requestedAt, now = Date.now(), run = runX
     throw error;
   }
 }
+export async function processQueuedScan(env, job) {
+  try {
+    if (job?.kind === 'stock-scan') return await processScan(env, job.requestedAt);
+    if (job?.kind === 'usdg-scan') return await processUsdgScan(env, job.requestedAt);
+    return { skipped: 'unknown-job' };
+  } catch {
+    console.error(JSON.stringify({ event: 'stock_scan_failed', kind: job?.kind }));
+    return { failed: true };
+  }
+}
+async function dispatchScan(env, job) {
+  if (env.STATE_STORAGE === 'durable-object' && env.MONITOR_STATE) {
+    return await env.MONITOR_STATE.get(env.MONITOR_STATE.idFromName('public-monitors-v1')).scan(job);
+  }
+  // Compatibility with the original D1-backed deployment.
+  return await env.SCAN_QUEUE.send(job);
+}
 export default {
   async scheduled(controller, env, ctx) {
     if (env.USDG_SCAN_ENABLED === 'true' && new Date(controller.scheduledTime).getUTCMinutes() % 3 === 1) {
       ctx.waitUntil((async () => {
-        await env.SCAN_QUEUE.send({ kind:'usdg-scan',requestedAt:controller.scheduledTime });
+        await dispatchScan(env, { kind:'usdg-scan',requestedAt:controller.scheduledTime });
         await monitorStore(env).put('usdg-cron-v1',JSON.stringify({at:Date.now()}));
       })());
     }
     if (env.SCAN_ENABLED !== 'true' || new Date(controller.scheduledTime).getUTCMinutes() % 3 !== 0) return;
     ctx.waitUntil((async () => {
-      await env.SCAN_QUEUE.send({ kind:'stock-scan',requestedAt:controller.scheduledTime });
+      await dispatchScan(env, { kind:'stock-scan',requestedAt:controller.scheduledTime });
       await monitorStore(env).put('stock-cron-v1',JSON.stringify({at:Date.now()}));
     })());
   },
   async queue(batch, env) {
-    // A dedicated max_concurrency=1 Queue serializes state transitions and notifications.
+    // Drain old queued jobs through the same serializer as new cron runs.
     for (const message of batch.messages) {
-      try {
-        if (message.body?.kind === 'stock-scan') await processScan(env,message.body.requestedAt);
-        if (message.body?.kind === 'usdg-scan') await processUsdgScan(env,message.body.requestedAt);
-      } catch { console.error(JSON.stringify({event:'stock_scan_failed'})); }
+      if (env.STATE_STORAGE === 'durable-object' && env.MONITOR_STATE) {
+        await env.MONITOR_STATE.get(env.MONITOR_STATE.idFromName('public-monitors-v1')).scan(message.body);
+      } else await processQueuedScan(env, message.body);
       // Next scheduled scan rechecks failed deliveries without replaying stale prices.
       message.ack();
     }

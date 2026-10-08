@@ -5,9 +5,21 @@
   "account_id": "1e48e927816f1c260c9085542a4f658f",
   "workers_dev": true,
   "durable_objects": {
-    "bindings": [{ "name": "MONITOR_STATE", "class_name": "MonitorState" }]
+    "bindings": [
+      {
+        "name": "MONITOR_STATE",
+        "class_name": "MonitorState"
+      }
+    ]
   },
-  "migrations": [{ "tag": "monitor-state-v1", "new_sqlite_classes": ["MonitorState"] }],
+  "migrations": [
+    {
+      "tag": "monitor-state-v1",
+      "new_sqlite_classes": [
+        "MonitorState"
+      ]
+    }
+  ],
   "observability": {
     "enabled": true
   },
@@ -24,12 +36,6 @@
     ]
   },
   "queues": {
-    "producers": [
-      {
-        "binding": "SCAN_QUEUE",
-        "queue": "yc-stock-scan"
-      }
-    ],
     "consumers": [
       {
         "queue": "yc-stock-scan",
