@@ -1,5 +1,5 @@
 import {TOKENS,RULES} from './config.mjs';
-import {collect,transition,alertText,summaryText} from './core.mjs';
+import {collect,transition,alertText} from './core.mjs';
 export async function scan(env, fetcher=fetch, now=Date.now(), pause=async()=>{}, providedRows=null) {
   let old=await env.MONITOR.get('state','json')||{rows:[],signals:{},events:[]};
   if (old.source!=='dexscreener') old={rows:[],signals:{},events:[],source:'dexscreener'};
@@ -31,13 +31,8 @@ export async function scan(env, fetcher=fetch, now=Date.now(), pause=async()=>{}
     const history=[...(prev?.source==='dexscreener'?prev.history||[]:[]),{at:timestamp,v:row.volume.m5}].slice(-72);
     return {...row,history,source:'dexscreener'};
   });
-  const state={source:'dexscreener',rows,signals,events:old.events||[],scannedAt:timestamp,notification:old.notification||'not-configured',lastSummaryAt:old.lastSummaryAt||0,summaryNotification:old.summaryNotification||'not-configured'};
-  const hours=Number(env.SUMMARY_INTERVAL_HOURS);
-  const window=env.SUMMARY_WINDOW==='h24'?'h24':'h1';
-  // Only complete fresh snapshots can establish the ranking across the whitelist.
-  const complete=rows.length===TOKENS.length&&rows.every(r=>!['error','inconsistent'].includes(r.status)&&!r.stale&&r.updatedAt===timestamp);
-  const summaryDue=[3,6].includes(hours)&&complete&&now-state.lastSummaryAt>=hours*3600000;
-  if (!env.TG_BOT_TOKEN||!env.TG_CHANNEL_ID||(!alerts.length&&!summaryDue)) {
+  const state={source:'dexscreener',rows,signals,events:old.events||[],scannedAt:timestamp,notification:old.notification||'not-configured'};
+  if (!env.TG_BOT_TOKEN||!env.TG_CHANNEL_ID||!alerts.length) {
     await env.MONITOR.put('state',JSON.stringify(state));
     return state;
   }
@@ -70,13 +65,6 @@ export async function scan(env, fetcher=fetch, now=Date.now(), pause=async()=>{}
       state.notification='ok';
     } catch { state.notification='error'; }
   }
-  if (summaryDue) {
-    try {
-      await send(summaryText(rows,timestamp,window));
-      state.lastSummaryAt=now;
-      state.summaryNotification='ok';
-    } catch { state.summaryNotification='error'; }
-  }
   await env.MONITOR.put('state',JSON.stringify(state));
   return state;
 }
@@ -102,17 +90,17 @@ export default {
       const current=await env.MONITOR.get('state','json');
       if (current?.source==='dexscreener'&&Date.parse(current.scannedAt)>=at) return Response.json({accepted:false,reason:'older-snapshot'});
       const state=await scan(env,fetch,at,async()=>{},body.rows);
-      return Response.json({accepted:true,scannedAt:state.scannedAt,valid:state.rows.filter(r=>r.status!=='error').length,notification:state.notification,summaryNotification:state.summaryNotification},{headers:{'Cache-Control':'no-store'}});
+      return Response.json({accepted:true,scannedAt:state.scannedAt,valid:state.rows.filter(r=>r.status!=='error').length,notification:state.notification},{headers:{'Cache-Control':'no-store'}});
     }
     if (request.method==='POST'&&url.pathname==='/admin/scan') {
       if (!env.ADMIN_TOKEN||request.headers.get('Authorization')!==`Bearer ${env.ADMIN_TOKEN}`) return new Response('Not found',{status:404});
       const state=await scan(env);
-      return Response.json({scannedAt:state.scannedAt,valid:state.rows.filter(r=>r.status!=='error').length,notification:state.notification,summaryNotification:state.summaryNotification},{headers:{'Cache-Control':'no-store'}});
+      return Response.json({scannedAt:state.scannedAt,valid:state.rows.filter(r=>r.status!=='error').length,notification:state.notification},{headers:{'Cache-Control':'no-store'}});
     }
     if (request.method!=='GET'||url.pathname!=='/snapshot') return new Response('Not found',{status:404});
     const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=60','Access-Control-Allow-Origin':env.SITE_ORIGIN,'X-Content-Type-Options':'nosniff'};
     const state=await env.MONITOR.get('state','json');
     if (!state) return Response.json({error:'warming-up'},{status:503,headers});
-    return Response.json({rows:state.rows,events:state.events,scannedAt:state.scannedAt,rules:RULES,notification:state.notification,summaryNotification:state.summaryNotification},{headers});
+    return Response.json({rows:state.rows,events:state.events,scannedAt:state.scannedAt,rules:RULES,notification:state.notification},{headers});
   }
 };

@@ -70,10 +70,3 @@ export function alertText(rows, now) {
   return ['📈 YC 链上信号｜Robinhood Chain 美股交易量放量',...rows.map(r=>`${r.symbol}/USDG · ${r.status==='strong'?'强放量':r.reason==='1h'?'持续放量':'开始放量'}\n5m ${money(r.volume.m5)} · 1h ${money(r.volume.h1)} · ${r.multiple.toFixed(1)}×（${r.reason==='5m'?'前55m均值':'前5h均值'}）\n5m ${r.trades5m} 笔 · 流动性 ${money(r.liquidity)}\n1h 成交量 / 已知流动性 ${turnover(r)}`),
     `采集时间 ${now}（UTC）`,'Robinhood Chain · 已发现 USDG 池成交量合计；请核实实际路由和 LP 风险。','https://yc-crypto.pages.dev/monitor/robinhood-volume/'].join('\n\n');
 }
-
-export function summaryText(rows, now, window='h1') {
-  const top=[...rows].sort((a,b)=>b.volume[window]-a.volume[window]||a.symbol.localeCompare(b.symbol)).slice(0,3);
-  return ['📋 YC 链上信号｜Robinhood Chain 美股交易量 Top 3',`按过去${window==='h24'?'24':'1'}小时成交量排名（USD）`,
-    ...top.map((r,i)=>`${i+1}. ${r.symbol}/USDG${['rising','strong'].includes(r.status)?' · 放量中':''}\n5m ${money(r.volume.m5)} · 1h ${money(r.volume.h1)} · 24h ${money(r.volume.h24)}\n已知流动性 ${money(r.liquidity)}\n1h 成交量 / 已知流动性 ${turnover(r)}`),
-    `采集时间 ${now}（UTC）`,'Robinhood Chain · 已发现 USDG 池成交量合计。','https://yc-crypto.pages.dev/monitor/robinhood-volume/'].join('\n\n');
-}

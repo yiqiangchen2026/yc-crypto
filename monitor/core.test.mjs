@@ -82,48 +82,12 @@ test('ingestion requires its own key, rejects wrong contracts and stale replays'
  assert.equal((await send({scannedAt,rows})).status,200);assert.equal(saved.rows.length,16);
  const replay=await send({scannedAt,rows});assert.equal((await replay.json()).accepted,false);
 });
-test('periodic ranking sends without alerts, waits six hours, and survives state updates',async()=>{
- let saved,calls=[];const now=Date.parse('2026-10-05T00:00:00Z');
- const env={SUMMARY_INTERVAL_HOURS:'6',SUMMARY_WINDOW:'h1',TG_BOT_TOKEN:'test-only',TG_CHANNEL_ID:'test',MONITOR:{get:async()=>saved,put:async(k,v)=>{saved=JSON.parse(v);}}};
- const rows=at=>TOKENS.map((t,i)=>({...t,status:'normal',volume:{m5:0,h1:i*100,h6:i*100,h24:(16-i)*1000},liquidity:10000,updatedAt:new Date(at).toISOString()}));
- const fetcher=async(url,init)=>{calls.push(JSON.parse(init.body).text);return Response.json({ok:true});};
- await scan(env,fetcher,now,async()=>{},rows(now));
- assert.equal(calls.length,1);assert.ok(calls[0].includes(`1. ${TOKENS[15].symbol}/USDG`));assert.equal(saved.events.length,0);
- await scan(env,fetcher,now+5*3600000,async()=>{},rows(now+5*3600000));assert.equal(calls.length,1);
- await scan(env,fetcher,now+6*3600000,async()=>{},rows(now+6*3600000));assert.equal(calls.length,2);assert.equal(saved.lastSummaryAt,now+6*3600000);
-});
-test('periodic ranking retries failed delivery, supports 24h, skips incomplete data',async()=>{
- let saved,calls=0;const now=Date.parse('2026-10-05T00:00:00Z');
- const env={SUMMARY_INTERVAL_HOURS:'3',SUMMARY_WINDOW:'h24',TG_BOT_TOKEN:'test-only',TG_CHANNEL_ID:'test',MONITOR:{get:async()=>saved,put:async(k,v)=>{saved=JSON.parse(v);}}};
- const rows=at=>TOKENS.map((t,i)=>({...t,status:'normal',volume:{m5:0,h1:i*100,h6:i*100,h24:(16-i)*1000},liquidity:10000,updatedAt:new Date(at).toISOString()}));
- await scan(env,async()=>{calls++;return Response.json({ok:false});},now,async()=>{},rows(now));assert.equal(saved.lastSummaryAt,0);assert.equal(saved.summaryNotification,'error');
- await scan(env,async(url,init)=>{calls++;assert.ok(JSON.parse(init.body).text.includes(`1. ${TOKENS[0].symbol}/USDG`));return Response.json({ok:true});},now+300000,async()=>{},rows(now+300000));assert.equal(calls,2);assert.equal(saved.summaryNotification,'ok');
- const incomplete=rows(now+4*3600000);incomplete[0].status='error';
- await scan(env,async()=>{calls++;return Response.json({ok:true});},now+4*3600000,async()=>{},incomplete);assert.equal(calls,2);
- const inconsistent=rows(now+5*3600000);inconsistent[0].status='inconsistent';
- await scan(env,async()=>{calls++;return Response.json({ok:true});},now+5*3600000,async()=>{},inconsistent);assert.equal(calls,2);
-});
 test('early alerts require absolute volume and trades; strong requires substantial volume',()=>{
  const q=pool({m5:18901,h1:36712,h6:60000,h24:100000});q.liquidity.usd=1280671;q.txns.m5={buys:10,sells:11};
  const row=summarize(token,[q]);assert.equal(row.status,'rising');assert.equal(row.reason,'5m');assert.ok(alertText([row],'test').includes('2.9%'));
  const low=pool({m5:14000,h1:14000,h6:14000,h24:14000});assert.equal(summarize(token,[low]).status,'normal');
  const few=pool();few.txns.m5={buys:4,sells:5};assert.equal(summarize(token,[few]).status,'normal');
  const strong=pool({m5:50000,h1:60000,h6:100000,h24:200000});assert.equal(summarize(token,[strong]).status,'strong');
-});
-
-test('each scan uses two KV writes even with a summary or failed notification',async()=>{
- let saved,writes=0;
- const now=Date.parse('2026-10-05T00:00:00Z');
- const env={TG_BOT_TOKEN:'test-only',TG_CHANNEL_ID:'test',SUMMARY_INTERVAL_HOURS:'6',MONITOR:{get:async()=>saved,put:async(k,v)=>{writes++;saved=JSON.parse(v);}}};
- const rows=at=>TOKENS.map(t=>({...t,status:'normal',volume:{m5:0,h1:1,h6:1,h24:1},liquidity:10000,updatedAt:new Date(at).toISOString()}));
- await scan(env,async()=>Response.json({ok:false}),now,async()=>{},rows(now));
- assert.equal(writes,2);assert.equal(saved.summaryNotification,'error');assert.equal(saved.lastSummaryAt,0);
- writes=0;
- await scan(env,async()=>Response.json({ok:true}),now+300000,async()=>{},rows(now+300000));
- assert.equal(writes,2);assert.equal(saved.summaryNotification,'ok');assert.equal(saved.lastSummaryAt,now+300000);
- writes=0;
- await scan(env,async()=>{throw Error('unexpected send');},now+600000,async()=>{},rows(now+600000));
- assert.equal(writes,2);assert.equal(saved.scannedAt,new Date(now+600000).toISOString());assert.equal(saved.scanningUntil,undefined);
 });
 
 test('volume signals route exclusively to private or public destinations',async()=>{
@@ -143,4 +107,16 @@ test('volume settings outage fails closed without marking an alert delivered',as
  const env={TG_BOT_TOKEN:'test',TG_CHANNEL_ID:'test',CHANNEL_CONTROLS:{getSettings:async()=>{throw Error('offline');}},MONITOR:{get:async()=>saved,put:async(k,v)=>{saved=JSON.parse(v);}}};
  await scan(env,async()=>{sends++;return Response.json({ok:true});},now,async()=>{},[{...summarize(token,[pool()]),updatedAt:new Date(now).toISOString()}]);
  assert.equal(sends,0);assert.equal(saved.notification,'settings-unavailable');assert.equal(saved.events.length,0);
+});
+
+test('legacy ranking settings and state cannot send periodic channel messages',async()=>{
+ let saved={source:'dexscreener',rows:[],signals:{},events:[],lastSummaryAt:1,summaryNotification:'error'},writes=0;
+ const now=Date.parse('2026-10-09T00:00:00Z');
+ const env={SUMMARY_INTERVAL_HOURS:'6',SUMMARY_WINDOW:'h1',TG_BOT_TOKEN:'test',TG_CHANNEL_ID:'test',MONITOR:{get:async()=>saved,put:async(k,v)=>{writes++;saved=JSON.parse(v);}}};
+ for(const at of [now,now+6*3600000]) {
+  writes=0;
+  const rows=TOKENS.map(t=>({...t,status:'normal',volume:{m5:0,h1:100,h6:100,h24:100},liquidity:10000,updatedAt:new Date(at).toISOString()}));
+  await scan(env,async()=>{throw Error('unexpected notification');},at,async()=>{},rows);
+  assert.equal(writes,2);assert.equal(saved.rows.length,16);assert.equal(saved.lastSummaryAt,undefined);assert.equal(saved.summaryNotification,undefined);
+ }
 });

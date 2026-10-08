@@ -6,6 +6,6 @@
   "workers_dev": true,
   "services": [{"binding":"PRIVATE_NOTIFIER", "service":"xlayer-wallet-report", "entrypoint":"PrivateSignalNotifier"}, {"binding":"COLLECTOR", "service":"yc-volume-collector"}, {"binding":"CHANNEL_CONTROLS", "service":"yc-stock-monitor", "entrypoint":"ChannelControls"}],
   "triggers": { "crons": [] },
-  "vars": { "SITE_ORIGIN": "https://yc-crypto.pages.dev", "TG_CHANNEL_ID": "-1004450250306", "SUMMARY_INTERVAL_HOURS": "6", "SUMMARY_WINDOW": "h1" },
+  "vars": { "SITE_ORIGIN": "https://yc-crypto.pages.dev", "TG_CHANNEL_ID": "-1004450250306" },
   "kv_namespaces": [{ "binding": "MONITOR", "id": "d17f21fa76b14ac4ab802715f0b351e9" }]
 }
