@@ -125,3 +125,21 @@ test('each scan uses two KV writes even with a summary or failed notification',a
  await scan(env,async()=>{throw Error('unexpected send');},now+600000,async()=>{},rows(now+600000));
  assert.equal(writes,2);assert.equal(saved.scannedAt,new Date(now+600000).toISOString());assert.equal(saved.scanningUntil,undefined);
 });
+
+test('volume notification switch blocks alerts without stopping collection and resumes after enabling',async()=>{
+ let saved,enabled=false,sends=0;const now=10000000;
+ const env={TG_BOT_TOKEN:'test',TG_CHANNEL_ID:'test',CHANNEL_CONTROLS:{getSettings:async()=>({volume:enabled})},MONITOR:{get:async()=>saved,put:async(k,v)=>{saved=JSON.parse(v);}}};
+ const rows=at=>[{...summarize(token,[pool()]),updatedAt:new Date(at).toISOString()}];
+ const fetcher=async()=>{sends++;return Response.json({ok:true});};
+ await scan(env,fetcher,now,async()=>{},rows(now));
+ assert.equal(sends,0);assert.equal(saved.notification,'disabled');assert.equal(saved.rows.length,1);assert.equal(saved.events.length,0);
+ enabled=true;
+ await scan(env,fetcher,now+300000,async()=>{},rows(now+300000));
+ assert.equal(sends,1);assert.equal(saved.notification,'ok');
+});
+test('volume settings outage fails closed without marking an alert delivered',async()=>{
+ let saved,sends=0;const now=10000000;
+ const env={TG_BOT_TOKEN:'test',TG_CHANNEL_ID:'test',CHANNEL_CONTROLS:{getSettings:async()=>{throw Error('offline');}},MONITOR:{get:async()=>saved,put:async(k,v)=>{saved=JSON.parse(v);}}};
+ await scan(env,async()=>{sends++;return Response.json({ok:true});},now,async()=>{},[{...summarize(token,[pool()]),updatedAt:new Date(now).toISOString()}]);
+ assert.equal(sends,0);assert.equal(saved.notification,'settings-unavailable');assert.equal(saved.events.length,0);
+});

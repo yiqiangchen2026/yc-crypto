@@ -49,7 +49,14 @@ export async function scan(env, fetcher=fetch, now=Date.now(), pause=async()=>{}
     const result=await response.json();
     if (!response.ok||!result.ok) throw new Error('notification rejected');
   };
-  if (alerts.length) {
+  // Fail closed if the shared control service cannot confirm notification state.
+  let volumeEnabled = true;
+  if (env.CHANNEL_CONTROLS) {
+    try { volumeEnabled = (await env.CHANNEL_CONTROLS.getSettings()).volume === true; }
+    catch { volumeEnabled = false; state.notification = 'settings-unavailable'; }
+  }
+  if (!volumeEnabled && state.notification !== 'settings-unavailable') state.notification = 'disabled';
+  if (alerts.length && volumeEnabled) {
     try {
       await send(alertText(alerts,timestamp));
       for (const row of alerts) {

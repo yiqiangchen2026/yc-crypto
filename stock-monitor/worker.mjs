@@ -2,6 +2,7 @@ import { runXStockMonitor } from './core.mjs';
 import { createOkxClient } from './okx-client.mjs';
 import { STATE_KEY, monitorStore, publicSnapshot, scanRun, recordMonitorScan } from './storage.mjs';
 import { processUsdgScan, usdgResponse } from '../usdg-monitor/worker.mjs';
+import { channelSettings } from './channel-settings.mjs';
 export async function processScan(env, requestedAt, now = Date.now(), run = runXStockMonitor) {
   if (env.SCAN_ENABLED !== 'true') return { skipped:'disabled' };
   if (!Number.isFinite(requestedAt) || requestedAt > now + 60000 || now-requestedAt > 6*60000) return { skipped:'expired' };
@@ -10,7 +11,7 @@ export async function processScan(env, requestedAt, now = Date.now(), run = runX
   if (last?.last_slot >= slot) return { skipped:'duplicate' };
   const runtime = { ...env, STATE:monitorStore(env) };
   const notify = async (text, options) => {
-    if (env.XSTOCK_PUBLIC_ALERTS_ENABLED !== 'true') return;
+    if (!(await channelSettings(env)).stocks) return;
     if (!env.NOTIFIER) throw new Error('Stock notifier unavailable');
     await env.NOTIFIER.send(text, options || {});
   };
@@ -74,12 +75,12 @@ export default {
       if (path === '/health') {
         const row = await scanRun(env);
         const cron = await monitorStore(env).get('stock-cron-v1','json');
-        return Response.json({ enabled:env.SCAN_ENABLED === 'true',notificationsEnabled:env.XSTOCK_PUBLIC_ALERTS_ENABLED === 'true',
+        return Response.json({ enabled:env.SCAN_ENABLED === 'true',notificationsEnabled:(await channelSettings(env)).stocks,
           lastCronAt:cron?.at||null,lastAttemptAt:row?.last_attempt_at||null,lastSuccessAt:row?.last_success_at||null,
           lastErrorAt:row?.last_error_at||null,error:row?.last_error||null,runCount:row?.run_count||0 },{headers:{...headers,'Cache-Control':'no-store'}});
       }
       const state = await monitorStore(env).get(STATE_KEY,'json');
-      const snapshot = publicSnapshot(state,env.XSTOCK_PUBLIC_ALERTS_ENABLED === 'true');
+      const snapshot = publicSnapshot(state,(await channelSettings(env)).stocks);
       return Response.json(snapshot || {error:'warming-up'},{status:snapshot?200:503,headers});
     } catch { return Response.json({error:'snapshot-unavailable'},{status:503,headers}); }
   }

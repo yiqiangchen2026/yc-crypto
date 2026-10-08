@@ -4,7 +4,7 @@
   "compatibility_date": "2026-10-04",
   "account_id": "1e48e927816f1c260c9085542a4f658f",
   "workers_dev": true,
-  "services": [{"binding":"COLLECTOR", "service":"yc-volume-collector"}],
+  "services": [{"binding":"COLLECTOR", "service":"yc-volume-collector"}, {"binding":"CHANNEL_CONTROLS", "service":"yc-stock-monitor", "entrypoint":"ChannelControls"}],
   "triggers": { "crons": [] },
   "vars": { "SITE_ORIGIN": "https://yc-crypto.pages.dev", "TG_CHANNEL_ID": "-1004450250306", "SUMMARY_INTERVAL_HOURS": "6", "SUMMARY_WINDOW": "h1" },
   "kv_namespaces": [{ "binding": "MONITOR", "id": "d17f21fa76b14ac4ab802715f0b351e9" }]
