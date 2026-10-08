@@ -41,7 +41,11 @@ export async function scan(env, fetcher=fetch, now=Date.now(), pause=async()=>{}
     await env.MONITOR.put('state',JSON.stringify(state));
     return state;
   }
-  const send=async text=>{
+  const send=async (text, isPublic=true)=>{
+    if (!isPublic) {
+      if (!env.PRIVATE_NOTIFIER) throw Error("Private notifier unavailable");
+      return env.PRIVATE_NOTIFIER.send(text);
+    }
     const response=await fetcher(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`,{
       method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(12000),
       body:JSON.stringify({chat_id:env.TG_CHANNEL_ID,text,link_preview_options:{is_disabled:true}})
@@ -50,15 +54,14 @@ export async function scan(env, fetcher=fetch, now=Date.now(), pause=async()=>{}
     if (!response.ok||!result.ok) throw new Error('notification rejected');
   };
   // Fail closed if the shared control service cannot confirm notification state.
-  let volumeEnabled = true;
+  let volumePublic = true, settingsAvailable = true;
   if (env.CHANNEL_CONTROLS) {
-    try { volumeEnabled = (await env.CHANNEL_CONTROLS.getSettings()).volume === true; }
-    catch { volumeEnabled = false; state.notification = 'settings-unavailable'; }
+    try { volumePublic = (await env.CHANNEL_CONTROLS.getSettings()).volume === true; }
+    catch { settingsAvailable = false; state.notification = 'settings-unavailable'; }
   }
-  if (!volumeEnabled && state.notification !== 'settings-unavailable') state.notification = 'disabled';
-  if (alerts.length && volumeEnabled) {
+  if (alerts.length && settingsAvailable) {
     try {
-      await send(alertText(alerts,timestamp));
+      await send(alertText(alerts,timestamp),volumePublic);
       for (const row of alerts) {
         signals[row.symbol]={...signals[row.symbol],lastAlert:now,lastLevel:row.status,armed:false};
         state.events.unshift({symbol:row.symbol,at:timestamp,level:row.status,multiple:row.multiple,volume5m:row.volume.m5});

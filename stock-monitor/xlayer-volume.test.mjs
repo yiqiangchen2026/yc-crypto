@@ -19,3 +19,14 @@ test('X Layer delivery failure retries, successful alerts cool down and errors p
  await scanVolume(env,api,now+10*60000);assert.equal(sends,2);
  const updated=saved.rows[0].updatedAt;await scanVolume(env,async()=>{throw Error('offline');},now+15*60000);assert.equal(saved.rows[0].updatedAt,updated);assert.equal(saved.rows[0].status,'error');assert.equal(publicVolume(saved).signals,undefined);
 });
+
+test('private X Layer signals keep retry and cooldown behavior',async()=>{
+ const values=new Map([['channel-notifications-xlayerVolume-v1','false']]);let sends=0,fail=true;
+ const env={STATE_STORAGE:'durable-object',MONITOR_STATE:{idFromName:()=>0,get:()=>({get:async k=>values.get(k)||null,put:async(k,v)=>values.set(k,v)})},NOTIFIER:{sendVolume:async(text,options)=>{assert.equal(options.private,true);sends++;if(fail)throw Error('offline');}}};
+ await scanVolume(env,async()=>TOKENS.map(sample),now);
+ assert.equal(JSON.parse(values.get(VOLUME_KEY)).notification,'error');
+ fail=false;await scanVolume(env,async()=>TOKENS.map(sample),now+5*60000);
+ assert.equal(JSON.parse(values.get(VOLUME_KEY)).events.length,4);
+ await scanVolume(env,async()=>TOKENS.map(sample),now+10*60000);
+ assert.equal(sends,2);
+});

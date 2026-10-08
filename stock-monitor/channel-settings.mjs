@@ -1,4 +1,5 @@
 import { monitorStore } from './storage.mjs';
+// Legacy booleans now select the destination: true = public channel, false = private hub.
 const types = ['stocks', 'volume', 'xlayerVolume'];
 export async function channelSettings(env) {
   const store = monitorStore(env);

@@ -13,6 +13,10 @@ export async function sendUsdgSignal(env, text, fetcher = fetch) {
   return deliverSignal(env,text,{},fetcher);
 }
 async function deliverSignal(env,text,options,fetcher) {
+  if (options.private === true) {
+    if (!env.PRIVATE_NOTIFIER) throw new Error('Private notifier unavailable');
+    return env.PRIVATE_NOTIFIER.send(text, { silent: options.silent === true });
+  }
   if (!env.TG_BOT_TOKEN || !env.TG_CHANNEL_ID) throw new Error('Signal destination unavailable');
   const response = await fetcher(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(12000),
@@ -24,7 +28,7 @@ async function deliverSignal(env,text,options,fetcher) {
   return { delivered: true };
 }
 
-export async function sendVolumeSignal(env,text,fetcher=fetch) {
+export async function sendVolumeSignal(env,text,fetcher=fetch,options={}) {
   if(typeof text!=='string'||text.length>3900||!text.startsWith('📈 YC 链上信号｜X Layer 美股交易量放量\n')||!text.endsWith('https://yc-crypto.pages.dev/monitor/xlayer-volume/')) throw Error('Invalid volume signal');
-  return deliverSignal(env,text,{},fetcher);
+  return deliverSignal(env,text,options,fetcher);
 }

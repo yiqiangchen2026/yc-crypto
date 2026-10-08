@@ -6,6 +6,6 @@ yc-stock-scan 已移除生产者绑定，保留消费者处理旧消息；旧消
 
 验证命令：npm run test:monitor；npx wrangler deploy --dry-run --config stock-monitor/wrangler.jsonc。
 
-2026-10-08 频道通知开关：股票价差默认关闭（`XSTOCK_PUBLIC_ALERTS_ENABLED=false`），交易量放量默认启用。`ChannelControls` 通过账户内 Service Binding 提供读取和设置，两个独立布尔值保存在既有 MonitorState Durable Object，不影响扫描、USDG 通知或交易量定时汇总。Bot 的 `/notifications` 或 `/menu` →「频道通知设置」可操作；仅已授权的私聊用户可更改。股票通知发送前重新读取开关，公开 health/snapshot 同步返回真实启用状态；交易量放量读取失败时不发送，也不记录为已推送。
+2026-10-08 通知改为公开 / 私有：股票价差默认私有，Robinhood Chain 和 X Layer 放量默认公开。沿用原三个持久化布尔值（true=公开，false=私有），保留已有选择。公开仅投递到「YC 链上信号」，私有仅通过账户内 Service Binding 投递到「YC 链上中枢」Bot 的固定授权私聊；失败不回退到另一目标。Bot 的 `/notifications` 或 `/menu` →「频道通知设置」可切换，仅授权私聊用户可更改。采集、冷却及重试继续运行；USDG 与交易量定时汇总不受这些设置影响。
 
 待处理：股票参考行情需区分港股竞价/连续交易/收盘、价格源延迟与行情时间差。计算修复前保持股票价差通知关闭。

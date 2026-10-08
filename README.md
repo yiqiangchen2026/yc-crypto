@@ -133,7 +133,7 @@ https://docs.dexscreener.com/api/reference
 
 推送 `main` 的 `monitor/**`、`stock-monitor/**`、包配置或部署工作流修改，会触发 `Deploy monitor Workers`。流程先测试两个监控，再发布交易量 Worker 的内部股票通知入口、发布股票 Worker，最后验证两个公开快照。网站继续由 `Deploy to Cloudflare Pages` 发布；无需每轮行情重发网站。
 
-- `yc-volume-monitor`：现有 KV 与采集流程保持不变；`StockNotifier` 是仅服务绑定可调用的通知入口，固定向现有「YC 链上信号」频道发送，无公开通知 HTTP 接口。TG Secret 仍只在此 Worker。
+- `yc-volume-monitor`：现有 KV 与采集流程保持不变；`StockNotifier` 是仅服务绑定可调用的通知入口，按公开 / 私有设置，分别向「YC 链上信号」频道或经账户内 Service Binding 向「YC 链上中枢」Bot 发送，无公开通知 HTTP 接口。频道 TG Secret 留在此 Worker，中枢 Bot Secret 留在中枢 Worker。
 - `yc-stock-monitor`：SQLite 型 Durable Object `MonitorState` 保存股票/USDG 状态，专用单并发 `yc-stock-scan` Queue，每分钟 Cron 唤醒、每 3 分钟投递任务，过期任务和成功执行过的时间槽跳过。无公开手动扫描或配置接口。
 - `stock-monitor/core.mjs`：移植的 39 对股票折价引擎；`market-clock.mjs` 保留行情时效和市场日历判断。
 - `stock-monitor/storage.mjs`：行情、乘数与确认/冷却状态，使用 Durable Object 避免 D1 账户额度故障及 KV 每日写入限制；`/health` 提供不含凭据的受控执行状态。

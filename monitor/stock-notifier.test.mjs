@@ -11,3 +11,13 @@ test('internal notifier restricts content and fixes destination, preserves silen
  assert.equal(calls.length,1);
  await assert.rejects(sendStockSignal({TG_BOT_TOKEN:'test',TG_CHANNEL_ID:'channel'},text,{},async()=>Response.json({ok:false},{status:403})),/delivery failed/);
 });
+
+test('private stock delivery never sends to the channel or falls back',async()=>{
+ const text='📉 YC 链上信号｜股票价差\nhttps://yc-crypto.pages.dev/monitor/stocks/';
+ let privateSends=0;
+ const env={TG_BOT_TOKEN:'test',TG_CHANNEL_ID:'channel',PRIVATE_NOTIFIER:{send:async(message,options)=>{privateSends++;assert.equal(message,text);assert.equal(options.silent,true);return {delivered:true};}}};
+ const fetcher=async()=>{throw Error('channel must not receive private signals');};
+ await sendStockSignal(env,text,{private:true,silent:true},fetcher);
+ assert.equal(privateSends,1);
+ await assert.rejects(sendStockSignal({...env,PRIVATE_NOTIFIER:null},text,{private:true},fetcher),/Private notifier unavailable/);
+});

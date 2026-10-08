@@ -12,9 +12,9 @@ export async function processScan(env, requestedAt, now = Date.now(), run = runX
   if (last?.last_slot >= slot) return { skipped:'duplicate' };
   const runtime = { ...env, STATE:monitorStore(env) };
   const notify = async (text, options) => {
-    if (!(await channelSettings(env)).stocks) return;
+    const isPublic = (await channelSettings(env)).stocks;
     if (!env.NOTIFIER) throw new Error('Stock notifier unavailable');
-    await env.NOTIFIER.send(text, options || {});
+    await env.NOTIFIER.send(text, { ...options, private: !isPublic });
   };
   try {
     const result = await run(runtime, createOkxClient(runtime), notify, now);

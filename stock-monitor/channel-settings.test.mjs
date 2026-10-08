@@ -18,16 +18,16 @@ test('channel defaults mute stocks; independent switches persist and reject inva
  await assert.rejects(setChannelNotification(env,'usdg',true));
  await assert.rejects(setChannelNotification(env,'stocks','true'));
 });
-test('muted stocks still scan, re-enable allows delivery, subsequent mute blocks next delivery',async()=>{
- const {env}=fixture(); let scans=0,sends=0;
- env.NOTIFIER={send:async()=>{sends++;}};
+test('stocks route exclusively to private or public while scans continue',async()=>{
+ const {env}=fixture(); let scans=0,sends=0;const routes=[];
+ env.NOTIFIER={send:async(text,options)=>{sends++;routes.push(options.private);}};
  const run=async(runtime,client,notify)=>{scans++;await notify('test');return {};};
  const now=Date.now();await processScan(env,now,now,run);
- assert.equal(scans,1);assert.equal(sends,0);
+ assert.equal(scans,1);assert.equal(sends,1);
  await setChannelNotification(env,'stocks',true);
- await processScan(env,now,now,run);assert.equal(sends,1);
+ await processScan(env,now,now,run);assert.equal(sends,2);
  await setChannelNotification(env,'stocks',false);
- await processScan(env,now,now,run);assert.equal(scans,3);assert.equal(sends,1);
+ await processScan(env,now,now,run);assert.equal(scans,3);assert.equal(sends,3);assert.deepEqual(routes,[true,false,true]);
 });
 
 test('split X Layer switch inherits legacy setting once and stays independent',async()=>{
