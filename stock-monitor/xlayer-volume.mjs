@@ -32,7 +32,7 @@ export async function scanVolume(env,okx,now=Date.now()) {
     }catch{return {...(prev||token),status:'error',stale:true,errorCode:'invalid-or-unavailable'};}
   });
   let notification=old.notification||'not-configured',enabled=false;
-  try{enabled=(await channelSettings(env)).volume;}catch{notification='settings-unavailable';}
+  try{enabled=(await channelSettings(env)).xlayerVolume;}catch{notification='settings-unavailable';}
   if(!enabled&&notification!=='settings-unavailable')notification='disabled';
   if(alerts.length&&enabled){try{
     const text=['📈 YC 链上信号｜X Layer 美股交易量放量',...alerts.map(r=>`${r.symbol} · ${r.status==='strong'?'强放量':'开始放量'}\n5m ${money(r.volume.m5)} · 1h ${money(r.volume.h1)} · ${r.multiple.toFixed(1)}×\n5m ${r.trades5m} 笔 · 流动性 ${money(r.liquidity)}\n基准：${r.reason==='5m'?'前55m每5m':'前3h每小时'}均值`),`采集时间 ${new Date(now).toISOString()}（UTC）`,'X Layer · OKX 收录代币成交量，未按比赛允许的报价币或路由过滤，不等于活动计分量。','https://yc-crypto.pages.dev/monitor/xlayer-volume/'].join('\n\n');

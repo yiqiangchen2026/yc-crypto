@@ -169,3 +169,5 @@ https://docs.dexscreener.com/api/reference
 `npm run test:monitor` 包含 USDG 规则、迁移、调度、去重、异常保留旧报价及通知边界测试。USDG 修改已纳入 GitHub 后台自动测试、部署工作流，前端继续使用原 Cloudflare Pages 自动部署。
 
 2026-10-08：修正 RH 采集写入旧 workers.dev 域名导致的 DNS 失败，移除 RH 监控中的 Trust Wallet 活动描述。新增 `/monitor/xlayer-volume/`，精确匹配 OKX Q3 Earnings 页面四个合约，使用现有 OKX API 凭据，每五分钟批量查询一次 price-info，在既有 Durable Object 串行扫描器内运行。独立保存历史、冷却和成功提醒；共用交易量通知开关。OKX 数据为代币汇总，未筛选比赛配对及路由；4h 窗口用于前3h小时放量基准，其他门槛沿用 RH。接口 `/xlayer-volume/snapshot` 不暴露内部冷却状态。
+
+2026-10-08 通知拆分：RH 沿用 volume 设置键，X Layer 使用独立 xlayerVolume 键。首次读取会保存旧开关状态作为 X Layer 初始值，之后各自独立；历史 volume 按钮仅影响 RH。监控入口更新为四张卡片，RH 页面及通知标题补齐链名称。
