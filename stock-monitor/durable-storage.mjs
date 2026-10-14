@@ -1,5 +1,5 @@
-// This small state store has its own Durable Objects free allowance.
-// No timers or external I/O keep the object alive between state operations.
+// Persistent scan baselines stay here; external I/O runs in Queue Workers.
+// These storage-only RPCs do not keep the object alive for the scan duration.
 export class MonitorStateStorage {
   constructor(storage) { this.storage = storage; }
   async initialize(seed) {

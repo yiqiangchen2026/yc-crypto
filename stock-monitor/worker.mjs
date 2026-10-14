@@ -14,6 +14,7 @@ export async function processScan(env, requestedAt, now = Date.now(), run = runX
   const notify = async (text, options) => {
     const isPublic = (await channelSettings(env)).stocks;
     if (!env.NOTIFIER) throw new Error('Stock notifier unavailable');
+    if(env.SCAN_ASSERT_CURRENT)await env.SCAN_ASSERT_CURRENT();
     await env.NOTIFIER.send(text, { ...options, private: !isPublic });
   };
   try {
@@ -40,10 +41,6 @@ export async function processQueuedScan(env, job) {
   }
 }
 async function dispatchScan(env, job) {
-  if (env.STATE_STORAGE === 'durable-object' && env.MONITOR_STATE) {
-    return await env.MONITOR_STATE.get(env.MONITOR_STATE.idFromName('public-monitors-v1')).scan(job);
-  }
-  // Compatibility with the original D1-backed deployment.
   return await env.SCAN_QUEUE.send(job);
 }
 export default {
@@ -62,10 +59,20 @@ export default {
     })());
   },
   async queue(batch, env) {
-    // Drain old queued jobs through the same serializer as new cron runs.
+    // Queue Workers execute all external I/O; DO calls only fence short state updates.
     for (const message of batch.messages) {
       if (env.STATE_STORAGE === 'durable-object' && env.MONITOR_STATE) {
-        await env.MONITOR_STATE.get(env.MONITOR_STATE.idFromName('public-monitors-v1')).scan(message.body);
+        const stub=env.MONITOR_STATE.get(env.MONITOR_STATE.idFromName('public-monitors-v1'));
+        const lease=await stub.claimScan(message.body);
+        if(lease.skipped==='busy'){message.retry({delaySeconds:30});continue;}
+        if(!lease.skipped){
+          let result;const startedAt=Date.now();
+          try {
+            const runtime={...env,SCAN_LEASE:lease.token,SCAN_ASSERT_CURRENT:()=>stub.assertScan(lease.token)};
+            if(env.NOTIFIER)runtime.NOTIFIER=Object.fromEntries(['send','sendVolume'].map(method=>[method,async(...args)=>{await stub.assertScan(lease.token);return env.NOTIFIER[method](...args);} ]));
+            result=await processQueuedScan(runtime,message.body);
+          } finally { await stub.finishScan(lease.token,Boolean(result&&!result.failed));console.log(JSON.stringify({event:"scan_worker_completed",kind:message.body.kind,durationMs:Date.now()-startedAt,failed:!result||Boolean(result.failed)})); }
+        }
       } else await processQueuedScan(env, message.body);
       // Next scheduled scan rechecks failed deliveries without replaying stale prices.
       message.ack();

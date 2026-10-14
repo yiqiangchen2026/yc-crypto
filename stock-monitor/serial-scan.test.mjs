@@ -21,20 +21,17 @@ test('stock and USDG runs stay serial across awaits and recover from a failed in
   assert.equal(await scans.run({ kind: 'next' }), 'next');
 });
 
-test('durable cron keeps three-minute cadence without Queue writes and drains legacy jobs through the same runner', async () => {
-  const values = new Map(), calls = [], pending = [];
-  const object = { scan: async job => calls.push(job), get: async key => values.get(key), put: async (k, v) => values.set(k, v) };
-  const env = { STATE_STORAGE: 'durable-object', SCAN_ENABLED: 'true', USDG_SCAN_ENABLED: 'true',
-    MONITOR_STATE: { idFromName: name => name, get: () => object },
-    SCAN_QUEUE: { send: () => assert.fail('Queue write') } };
-  const ctx = { waitUntil: task => pending.push(task) };
-  for (const minute of [0, 1, 2, 3, 4, 5]) {
-    await worker.scheduled({ scheduledTime: Date.parse(`2026-10-08T10:0${minute}:00Z`) }, env, ctx);
-    await Promise.all(pending);
-  }
-  assert.deepEqual(calls.map(j => j.kind), ['stock-scan', 'usdg-scan', 'stock-scan', 'usdg-scan']);
-  assert.ok(values.get('stock-cron-v1')); assert.ok(values.get('usdg-cron-v1'));
-  let acked = false;
-  await worker.queue({ messages: [{ body: calls[0], ack: () => { acked = true; } }] }, env);
-  assert.equal(calls.length, 5); assert.ok(acked);
+test('durable storage cron sends work to Queue instead of executing scans in DO', async () => {
+ const values=new Map(),calls=[],pending=[];
+ const object={scan:()=>assert.fail('DO must never execute a scan'),get:async k=>values.get(k),put:async(k,v)=>values.set(k,v),
+  claimScan:async()=>({skipped:'duplicate'})};
+ const env={STATE_STORAGE:'durable-object',SCAN_ENABLED:'true',USDG_SCAN_ENABLED:'true',MONITOR_STATE:{idFromName:n=>n,get:()=>object},SCAN_QUEUE:{send:async j=>calls.push(j)}};
+ for(const minute of [0,1,2,3,4,5]){await worker.scheduled({scheduledTime:Date.parse(`2026-10-08T10:0${minute}:00Z`)},env,{waitUntil:p=>pending.push(p)});await Promise.all(pending);}
+ assert.deepEqual(calls.map(j=>j.kind),['stock-scan','usdg-scan','stock-scan','usdg-scan']);
+ assert.ok(values.get('stock-cron-v1'));assert.ok(values.get('usdg-cron-v1'));
+ let acked=false;await worker.queue({messages:[{body:calls[0],ack:()=>acked=true}]},env);assert.equal(acked,true);
+});
+test('busy scan lease defers the Queue message without acknowledging it',async()=>{
+ let delay;const env={STATE_STORAGE:'durable-object',MONITOR_STATE:{idFromName:n=>n,get:()=>({claimScan:async()=>({skipped:'busy'})})}};
+ await worker.queue({messages:[{body:{},ack:()=>assert.fail('busy message ack'),retry:o=>delay=o.delaySeconds}]},env);assert.equal(delay,30);
 });

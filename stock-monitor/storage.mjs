@@ -7,7 +7,7 @@ export function monitorStore(env) {
       const value = await stub.get(key);
       return value == null ? null : type === 'json' ? JSON.parse(value) : value;
     },
-    async put(key, value) { await stub.put(key, value); }
+    async put(key, value) { if(env.SCAN_LEASE)await stub.putFenced(env.SCAN_LEASE,key,value); else await stub.put(key, value); }
   };
 }
 export async function scanRun(env) {
@@ -17,7 +17,7 @@ export async function scanRun(env) {
 export async function recordMonitorScan(env, now, success, slot) {
   if (env.STATE_STORAGE !== 'durable-object') return recordScan(env.STOCK_DB, now, success, slot);
   const stub = env.MONITOR_STATE.get(env.MONITOR_STATE.idFromName('public-monitors-v1'));
-  return await stub.recordScan(now, success, slot);
+  return env.SCAN_LEASE ? await stub.recordScanFenced(env.SCAN_LEASE,now,success,slot) : await stub.recordScan(now, success, slot);
 }
 export function stateStore(db) {
   return {

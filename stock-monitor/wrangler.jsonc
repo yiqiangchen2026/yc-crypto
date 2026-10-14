@@ -44,6 +44,12 @@
         "max_retries": 0,
         "max_concurrency": 1
       }
+    ],
+    "producers": [
+      {
+        "binding": "SCAN_QUEUE",
+        "queue": "yc-stock-scan"
+      }
     ]
   },
   "vars": {
