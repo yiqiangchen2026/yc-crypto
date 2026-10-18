@@ -4,6 +4,9 @@ import { ScanLease } from './scan-lease.mjs';
 export class MonitorState extends DurableObject {
  constructor(ctx,env) { super(ctx,env); this.store=new MonitorStateStorage(ctx.storage); this.lease=new ScanLease(ctx.storage); }
  async get(key) { return this.store.get(key); }
+ async getMany(keys) { return this.store.getMany(keys); }
+ async putMany(values) { return this.store.putMany(values); }
+ async putManyFenced(token,values) { return this.lease.write(token,()=>this.store.putMany(values)); }
  async put(key,value) { return this.store.put(key,value); }
  async recordScan(now,success,slot) { return this.store.recordScan(now,success,slot); }
  async claimScan(job) { await this.store.ready(); return this.lease.claim(job); }

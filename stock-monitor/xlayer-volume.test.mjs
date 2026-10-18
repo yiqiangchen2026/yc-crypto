@@ -11,7 +11,7 @@ test('X Layer exact contracts, fresh metrics and four-hour baseline guard alerts
 });
 test('X Layer delivery failure retries, successful alerts cool down and errors preserve source time',async()=>{
  let saved,fail=true,sends=0;
- const env={STATE_STORAGE:'durable-object',MONITOR_STATE:{idFromName:()=>0,get:()=>({get:async()=>saved?JSON.stringify(saved):null,put:async(k,v)=>{if(k===VOLUME_KEY)saved=JSON.parse(v);}})},NOTIFIER:{sendVolume:async()=>{sends++;if(fail)throw Error('failed');}}};
+ const env={STATE_STORAGE:'durable-object',MONITOR_STATE:{idFromName:()=>0,get:()=>({getMany:async keys=>keys.map(()=>null),get:async()=>saved?JSON.stringify(saved):null,put:async(k,v)=>{if(k===VOLUME_KEY)saved=JSON.parse(v);}})},NOTIFIER:{sendVolume:async()=>{sends++;if(fail)throw Error('failed');}}};
  // Store also contains channel controls; default volume setting is enabled.
  const api=async()=>TOKENS.map(sample);
  await scanVolume(env,api,now);assert.equal(saved.notification,'error');assert.equal(saved.events.length,0);
@@ -22,7 +22,7 @@ test('X Layer delivery failure retries, successful alerts cool down and errors p
 
 test('private X Layer signals keep retry and cooldown behavior',async()=>{
  const values=new Map([['channel-notifications-xlayerVolume-v1','false']]);let sends=0,fail=true;
- const env={STATE_STORAGE:'durable-object',MONITOR_STATE:{idFromName:()=>0,get:()=>({get:async k=>values.get(k)||null,put:async(k,v)=>values.set(k,v)})},NOTIFIER:{sendVolume:async(text,options)=>{assert.equal(options.private,true);sends++;if(fail)throw Error('offline');}}};
+ const env={STATE_STORAGE:'durable-object',MONITOR_STATE:{idFromName:()=>0,get:()=>({getMany:async keys=>keys.map(k=>values.get(k)||null),get:async k=>values.get(k)||null,put:async(k,v)=>values.set(k,v)})},NOTIFIER:{sendVolume:async(text,options)=>{assert.equal(options.private,true);sends++;if(fail)throw Error('offline');}}};
  await scanVolume(env,async()=>TOKENS.map(sample),now);
  assert.equal(JSON.parse(values.get(VOLUME_KEY)).notification,'error');
  fail=false;await scanVolume(env,async()=>TOKENS.map(sample),now+5*60000);

@@ -6,7 +6,7 @@ import { processUsdgScan } from '../usdg-monitor/worker.mjs';
 import { monitorStore, STATE_KEY } from './storage.mjs';
 function setup() {
   const values=new Map();
-  const storage={get:async key=>values.get(key),put:async(key,value)=>{
+  const storage={get:async key=>Array.isArray(key)?new Map(key.filter(k=>values.has(k)).map(k=>[k,values.get(k)])):values.get(key),put:async(key,value)=>{
     if(typeof key==='object')for(const [k,v] of Object.entries(key))values.set(k,v);
     else values.set(key,value);
   }};
@@ -49,4 +49,24 @@ test('failed durable scan preserves last success and remains retryable',async()=
   await processScan(env,now,now+1,async()=>({ok:true}));
   const success=JSON.parse(await object.get('stock-scan-run-v1'));
   assert.equal(success.last_error,null);assert.equal(success.last_success_at,now+1);
+});
+
+test('public requests use one batched RPC and the next request observes changed channel controls',async()=>{
+ const {object,env,values}=setup();await object.initialize(seed);
+ for(const [k,v]of Object.entries({'channel-notifications-stocks-v1':'true','channel-notifications-volume-v1':'true','channel-notifications-xlayerVolume-v1':'false','usdg-scan-run-v1':'{}','usdg-public-snapshot-v1':'{"updatedAt":123,"quote":{}}','xlayer-volume-v1':'{"rows":[]}'}))values.set(k,v);
+ const calls=[];env.MONITOR_STATE.get=()=>new Proxy(object,{get:(target,key)=>typeof target[key]==='function'?(...args)=>{calls.push(key);return target[key](...args)}:target[key]});
+ for(const path of ['/health','/snapshot','/usdg/health','/usdg/snapshot','/xlayer-volume/snapshot']){
+  calls.length=0;assert.equal((await worker.fetch(new Request('https://test'+path),env)).status,200);assert.deepEqual(calls,['getMany'],path);
+ }
+ values.set('channel-notifications-stocks-v1','false');
+ assert.equal((await(await worker.fetch(new Request('https://test/health'),env)).json()).notificationsEnabled,false);
+ assert.equal(env.MONITOR_READS,undefined);
+ values.set(STATE_KEY,'corrupt');assert.equal((await worker.fetch(new Request('https://test/snapshot'),env)).status,503);
+});
+test('USDG final snapshot and run status are committed by one batch; migrated alert state is preserved',async()=>{
+ const {object,env,values}=setup();await object.initialize(seed);let batches=0;
+ const put=object.putMany.bind(object);object.putMany=async v=>{batches++;assert.deepEqual(Object.keys(v).sort(),['usdg-public-snapshot-v1','usdg-scan-run-v1']);return put(v)};
+ const at=Date.now();await processUsdgScan(env,at,at,async()=>({checkedAt:at,grossEdgeRate:.001}));assert.equal(batches,1);
+ assert.equal(JSON.parse(values.get('usdg-scan-run-v1')).lastSlot,Math.floor(at/180000));assert.equal(JSON.parse(values.get('usdg-public-snapshot-v1')).updatedAt,at);
+ assert.equal(values.get('usdg-usdc-quote-alert-v2'),seed['usdg-usdc-quote-alert-v2']);
 });

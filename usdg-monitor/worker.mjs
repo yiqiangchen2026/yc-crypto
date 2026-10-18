@@ -21,10 +21,10 @@ export async function processUsdgScan(env, requestedAt, now = Date.now(), run = 
       if (!env.NOTIFIER) throw Error('USDG notifier unavailable');
       await env.NOTIFIER.sendUsdg(text);
     },now);
-    await store.put(SNAPSHOT_KEY,JSON.stringify({updatedAt:quote.checkedAt,quote:publicQuote(quote),
-      threshold:Number(env.USDG_ALERT_EDGE || .0001)}));
-    await store.put(RUN_KEY,JSON.stringify({...previous,lastAttemptAt:now,lastSuccessAt:now,error:null,
-      lastSlot:slot,runCount:(previous.runCount || 0)+1}));
+    await store.putMany({[SNAPSHOT_KEY]:JSON.stringify({updatedAt:quote.checkedAt,quote:publicQuote(quote),
+      threshold:Number(env.USDG_ALERT_EDGE || .0001)}),
+      [RUN_KEY]:JSON.stringify({...previous,lastAttemptAt:now,lastSuccessAt:now,error:null,
+      lastSlot:slot,runCount:(previous.runCount || 0)+1})});
     return quote;
   } catch (error) {
     await store.put(RUN_KEY,JSON.stringify({...previous,lastAttemptAt:now,lastErrorAt:now,

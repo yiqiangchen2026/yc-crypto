@@ -12,6 +12,15 @@ export class MonitorStateStorage {
     if (!await this.storage.get('migration-version')) throw Error('Monitor state requires migration');
   }
   async get(key) { await this.ready(); return await this.storage.get(key) ?? null; }
+  async getMany(keys) {
+    if (!Array.isArray(keys) || !keys.length || keys.length>32 || keys.some(k=>typeof k!=='string')) throw Error('Invalid state keys');
+    await this.ready(); const values=await this.storage.get(keys);
+    return keys.map(key=>values.get(key)??null);
+  }
+  async putMany(values) {
+    if (!values || typeof values!=='object' || Array.isArray(values) || !Object.keys(values).length || Object.keys(values).length>32) throw Error('Invalid state values');
+    await this.ready(); await this.storage.put(values);
+  }
   async put(key,value) { await this.ready(); await this.storage.put(key,value); }
   async recordScan(now,success,slot) {
     await this.ready();

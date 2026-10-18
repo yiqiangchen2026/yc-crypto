@@ -1,9 +1,9 @@
 import { scanVolume, VOLUME_KEY, publicVolume } from './xlayer-volume.mjs';
 import { runXStockMonitor } from './core.mjs';
 import { createOkxClient } from './okx-client.mjs';
-import { STATE_KEY, monitorStore, publicSnapshot, scanRun, recordMonitorScan } from './storage.mjs';
-import { processUsdgScan, usdgResponse } from '../usdg-monitor/worker.mjs';
-import { channelSettings } from './channel-settings.mjs';
+import { STATE_KEY, monitorStore, publicSnapshot, scanRun, recordMonitorScan, withMonitorReads } from './storage.mjs';
+import { processUsdgScan, usdgResponse, RUN_KEY as USDG_RUN_KEY, SNAPSHOT_KEY as USDG_SNAPSHOT_KEY } from '../usdg-monitor/worker.mjs';
+import { channelSettings, CHANNEL_KEYS } from './channel-settings.mjs';
 export async function processScan(env, requestedAt, now = Date.now(), run = runXStockMonitor) {
   if (env.SCAN_ENABLED !== 'true') return { skipped:'disabled' };
   if (!Number.isFinite(requestedAt) || requestedAt > now + 60000 || now-requestedAt > 6*60000) return { skipped:'expired' };
@@ -84,6 +84,8 @@ export default {
       'X-Content-Type-Options':'nosniff' };
     if (request.method !== 'GET' || !['/snapshot','/health','/usdg/snapshot','/usdg/health','/xlayer-volume/snapshot'].includes(path)) return new Response('Not found',{status:404});
     try {
+      const keys=path==='/health'?['stock-scan-run-v1','stock-cron-v1',...CHANNEL_KEYS]:path==='/snapshot'?[STATE_KEY,...CHANNEL_KEYS]:path==='/usdg/health'?[USDG_RUN_KEY,'usdg-cron-v1']:path==='/usdg/snapshot'?[USDG_RUN_KEY,USDG_SNAPSHOT_KEY]:[VOLUME_KEY];
+      env=await withMonitorReads(env,keys);
       if (path === '/xlayer-volume/snapshot') {
         const snapshot=publicVolume(await monitorStore(env).get(VOLUME_KEY,'json'));
         return Response.json(snapshot||{error:'warming-up'},{status:snapshot?200:503,headers});

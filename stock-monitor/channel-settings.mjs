@@ -1,9 +1,10 @@
 import { monitorStore } from './storage.mjs';
 // Legacy booleans now select the destination: true = public channel, false = private hub.
 const types = ['stocks', 'volume', 'xlayerVolume'];
+export const CHANNEL_KEYS=types.map(type=>`channel-notifications-${type}-v1`);
 export async function channelSettings(env) {
   const store = monitorStore(env);
-  const values = await Promise.all(types.map(type => store.get(`channel-notifications-${type}-v1`, 'json')));
+  const values = await store.getMany(CHANNEL_KEYS,'json');
   // Initialize the split setting once, preserving the old shared preference.
   if (typeof values[2] !== 'boolean') {
     values[2] = typeof values[1] === 'boolean' ? values[1] : true;

@@ -4,7 +4,7 @@ import {channelSettings,setChannelNotification} from './channel-settings.mjs';
 import {processScan} from './worker.mjs';
 function fixture() {
  const values=new Map();
- const stub={get:async key=>values.get(key)??null,put:async(k,v)=>values.set(k,v),recordScan:async()=>{}};
+ const stub={getMany:async keys=>keys.map(k=>values.get(k)??null),get:async key=>values.get(key)??null,put:async(k,v)=>values.set(k,v),recordScan:async()=>{}};
  return {values,env:{STATE_STORAGE:'durable-object',MONITOR_STATE:{idFromName:()=>'',get:()=>stub},SCAN_ENABLED:'true',XSTOCK_PUBLIC_ALERTS_ENABLED:'false'}};
 }
 test('channel defaults mute stocks; independent switches persist and reject invalid input',async()=>{
