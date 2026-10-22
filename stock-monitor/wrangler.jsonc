@@ -1,6 +1,6 @@
 {
   "name": "yc-stock-monitor",
-  "main": "entry.mjs",
+  "main": "../retired/worker.mjs",
   "compatibility_date": "2026-10-06",
   "account_id": "1e48e927816f1c260c9085542a4f658f",
   "workers_dev": true,
@@ -23,43 +23,22 @@
   "observability": {
     "enabled": true
   },
-  "services": [
-    {
-      "binding": "NOTIFIER",
-      "service": "yc-volume-monitor",
-      "entrypoint": "StockNotifier"
-    }
-  ],
+  "services": [],
   "triggers": {
-    "crons": [
-      "* * * * *"
-    ]
+    "crons": []
   },
   "queues": {
-    "consumers": [
-      {
-        "queue": "yc-stock-scan",
-        "max_batch_size": 1,
-        "max_batch_timeout": 1,
-        "max_retries": 0,
-        "max_concurrency": 1
-      }
-    ],
-    "producers": [
-      {
-        "binding": "SCAN_QUEUE",
-        "queue": "yc-stock-scan"
-      }
-    ]
+    "producers": [],
+    "consumers": []
   },
   "vars": {
-    "XLAYER_VOLUME_ENABLED": "true",
+    "XLAYER_VOLUME_ENABLED": "false",
     "SITE_ORIGIN": "https://yc-crypto.pages.dev",
     "STATE_STORAGE": "durable-object",
-    "USDG_SCAN_ENABLED": "true",
+    "USDG_SCAN_ENABLED": "false",
     "USDG_QUOTE_USDC": "5000",
     "USDG_ALERT_EDGE": "0.0001",
-    "SCAN_ENABLED": "true",
+    "SCAN_ENABLED": "false",
     "XSTOCK_PUBLIC_ALERTS_ENABLED": "false",
     "XSTOCK_QUOTE_USD": "500",
     "XSTOCK_ROUGH_DISCOUNT": "0.01",

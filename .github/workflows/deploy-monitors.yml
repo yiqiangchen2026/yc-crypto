@@ -1,47 +1,10 @@
-name: Deploy monitor Workers
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'monitor/**'
-      - 'stock-monitor/**'
-      - 'usdg-monitor/**'
-      - 'package*.json'
-      - '.github/workflows/deploy-monitors.yml'
-  workflow_dispatch:
+name: Retired monitor deployment
+on: workflow_dispatch
 permissions:
   contents: read
-concurrency:
-  group: monitor-workers-production
-  cancel-in-progress: false
 jobs:
-  deploy:
+  retired:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - run: npm ci
-      - name: Test monitors and notification boundary
-        run: npm run test:monitor
-      - name: Check deployment credentials
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
-        run: test -n "$CLOUDFLARE_API_TOKEN"
-      - name: Deploy volume monitor and internal stock notifier
-        run: npx wrangler deploy --config monitor/wrangler.jsonc
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
-      - name: Deploy independent stock monitor
-        run: npx wrangler deploy --config stock-monitor/wrangler.jsonc
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
-      - name: Verify public snapshots
-        run: |
-          curl --fail --retry 3 https://yc-stock-monitor.yc2026.workers.dev/snapshot -o /tmp/stocks.json
-          curl --fail --retry 3 https://yc-volume-monitor.yc2026.workers.dev/snapshot -o /tmp/volume.json
-          curl --fail --retry 3 https://yc-stock-monitor.yc2026.workers.dev/usdg/snapshot -o /tmp/usdg.json
-          node -e 'const u = require("/tmp/usdg.json"); if (!u.enabled || !Number.isFinite(u.quote?.grossEdgeRate)) throw Error("USDG snapshot unavailable");'
-          node -e 'for (const f of ["stocks", "volume"]) { const s = require(`/tmp/${f}.json`); if (!Array.isArray(s.rows) || !s.rows.length) throw Error(`${f} snapshot unavailable`); }'
+      - run: echo "Retired by user decision on 2026-10-22; do not re-enable."
