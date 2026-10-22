@@ -12,12 +12,6 @@
     "SITE_ORIGIN": "https://yc-crypto.pages.dev",
     "TG_CHANNEL_ID": "-1004450250306"
   },
-  "kv_namespaces": [
-    {
-      "binding": "MONITOR",
-      "id": "d17f21fa76b14ac4ab802715f0b351e9"
-    }
-  ],
   "queues": {
     "producers": [],
     "consumers": []
